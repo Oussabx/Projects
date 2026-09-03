@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a10"/>
+  <circle cx="600" cy="260" r="150" fill="url(#lav)"/>
+  <defs>
+    <linearGradient id="lav" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#cabbf9"/>
+      <stop offset="1" stop-color="#a98cf5"/>
+    </linearGradient>
+  </defs>
+  <path d="M540 210c14 0 26 10 29 24-9-4-20-2-27 5-8-8-9-20-2-29z" fill="#241f5c"/>
+  <path d="M561 240c9-13 28-17 41-9 11 7 16 21 11 34-19 8-42 3-52-10-6-6-6-11 0-15z" fill="#241f5c"/>
+  <text x="600" y="290" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="34" fill="#241f5c">PET</text>
+  <text x="600" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="34" fill="#241f5c">HERO</text>
+  <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="46" fill="#f4f2fb">Mobile Pet Grooming — Beirut</text>
+  <text x="600" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#b7b2cf">The grooming van that comes to your door</text>
+</svg>
