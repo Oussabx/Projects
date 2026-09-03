@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <rect width="300" height="300" fill="#fff8ec"/>
+  <circle cx="150" cy="155" r="82" fill="#ffc24b" opacity=".35"/>
+  <path d="M100 108c-18-20-8-38 10-32 6 14 6 26 6 38z" fill="#241f5c"/>
+  <path d="M200 108c18-20 8-38-10-32-6 14-6 26-6 38z" fill="#241f5c"/>
+  <path d="M108 104c4-10 14-12 18-4-4 6-12 8-18 4z" fill="#a98cf5"/>
+  <path d="M192 104c-4-10-14-12-18-4 4 6 12 8 18 4z" fill="#a98cf5"/>
+  <circle cx="150" cy="160" r="62" fill="#241f5c"/>
+  <circle cx="128" cy="152" r="9" fill="#fff"/>
+  <circle cx="172" cy="152" r="9" fill="#fff"/>
+  <circle cx="129" cy="153" r="4.5" fill="#241f5c"/>
+  <circle cx="173" cy="153" r="4.5" fill="#241f5c"/>
+  <path d="M144 176l6 6 6-6z" fill="#f5a623"/>
+  <path d="M150 182v6" stroke="#f7f0ff" stroke-width="2.5"/>
+  <path d="M150 188q-10 8-20 2" stroke="#f7f0ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M150 188q10 8 20 2" stroke="#f7f0ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M96 178h-28M96 184h-30M96 190h-28" stroke="#f7f0ff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M204 178h28M204 184h30M204 190h28" stroke="#f7f0ff" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <rect width="400" height="300" fill="#241f5c"/>
+  <!-- table -->
+  <rect x="70" y="215" width="260" height="14" rx="6" fill="#a98cf5"/>
+  <rect x="90" y="229" width="10" height="40" fill="#a98cf5"/>
+  <rect x="300" y="229" width="10" height="40" fill="#a98cf5"/>
+  <!-- dog on table -->
+  <ellipse cx="205" cy="205" rx="60" ry="28" fill="#f1e9ff"/>
+  <circle cx="150" cy="185" r="34" fill="#f1e9ff"/>
+  <path d="M128 165c-8-8-4-18 4-18 4 8 4 12 4 18z" fill="#f1e9ff"/>
+  <path d="M172 165c8-8 4-18-4-18-4 8-4 12-4 18z" fill="#f1e9ff"/>
+  <circle cx="142" cy="182" r="3.5" fill="#241f5c"/>
+  <circle cx="158" cy="182" r="3.5" fill="#241f5c"/>
+  <ellipse cx="150" cy="195" rx="9" ry="6" fill="#fff"/>
+  <!-- groomer figure -->
+  <circle cx="290" cy="110" r="26" fill="#ffc24b"/>
+  <path d="M270 100q20-14 40 0" stroke="#241f5c" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <rect x="255" y="132" width="70" height="80" rx="20" fill="#a98cf5"/>
+  <path d="M255 150c-14 6-24 20-26 36" stroke="#a98cf5" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <circle cx="228" cy="188" r="10" fill="#f7f0ff"/>
+  <!-- scissors in hand -->
+  <path d="M222 182l14-14M222 178l14 8" stroke="#f7f0ff" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="220" cy="180" r="3" fill="#f7f0ff"/>
+  <circle cx="220" cy="188" r="3" fill="#f7f0ff"/>
+</svg>

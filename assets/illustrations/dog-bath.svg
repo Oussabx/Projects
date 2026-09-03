@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <rect width="300" height="300" fill="#ffc24b"/>
+  <!-- tub -->
+  <path d="M50 210c0 25 45 40 100 40s100-15 100-40" fill="none" stroke="#241f5c" stroke-width="10" stroke-linecap="round"/>
+  <path d="M40 210h220" stroke="#241f5c" stroke-width="10" stroke-linecap="round"/>
+  <!-- suds -->
+  <circle cx="90" cy="195" r="14" fill="#fff"/>
+  <circle cx="110" cy="180" r="18" fill="#fff"/>
+  <circle cx="135" cy="192" r="12" fill="#fff"/>
+  <circle cx="70" cy="180" r="10" fill="#fff"/>
+  <!-- dog head -->
+  <circle cx="165" cy="140" r="55" fill="#241f5c"/>
+  <path d="M120 105c-14-10-28-8-30 4-2 12 8 22 20 22 4-10 6-18 10-26z" fill="#241f5c"/>
+  <path d="M205 108c14-8 28-4 28 8s-10 20-22 18c-2-10-2-18-6-26z" fill="#241f5c"/>
+  <ellipse cx="150" cy="150" rx="18" ry="13" fill="#fff8ec"/>
+  <circle cx="150" cy="149" r="4" fill="#241f5c"/>
+  <circle cx="140" cy="122" r="7" fill="#fff"/>
+  <circle cx="180" cy="122" r="7" fill="#fff"/>
+  <circle cx="141" cy="123" r="3.5" fill="#241f5c"/>
+  <circle cx="181" cy="123" r="3.5" fill="#241f5c"/>
+  <path d="M138 165q12 10 24 0" stroke="#fff8ec" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- bubbles floating -->
+  <circle cx="220" cy="90" r="9" fill="#fff" opacity=".8"/>
+  <circle cx="240" cy="70" r="5" fill="#fff" opacity=".8"/>
+  <circle cx="60" cy="100" r="6" fill="#fff" opacity=".8"/>
+</svg>

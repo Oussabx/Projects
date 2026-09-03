@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <rect width="300" height="300" fill="#cabbf9"/>
+  <!-- cat body -->
+  <ellipse cx="150" cy="220" rx="70" ry="40" fill="#241f5c"/>
+  <!-- cat head -->
+  <circle cx="150" cy="140" r="58" fill="#241f5c"/>
+  <path d="M104 100c-16-18-8-34 8-30 6 12 8 24 10 34z" fill="#241f5c"/>
+  <path d="M196 100c16-18 8-34-8-30-6 12-8 24-10 34z" fill="#241f5c"/>
+  <path d="M112 96c4-8 12-10 16-4-4 4-10 6-16 4z" fill="#a98cf5"/>
+  <path d="M188 96c-4-8-12-10-16-4 4 4 10 6 16 4z" fill="#a98cf5"/>
+  <circle cx="130" cy="138" r="8" fill="#fff"/>
+  <circle cx="170" cy="138" r="8" fill="#fff"/>
+  <circle cx="131" cy="139" r="4" fill="#241f5c"/>
+  <circle cx="171" cy="139" r="4" fill="#241f5c"/>
+  <path d="M144 158l6 6 6-6z" fill="#f5a623"/>
+  <path d="M96 162h-30M96 168h-32M96 174h-30" stroke="#f7f0ff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M204 162h30M204 168h32M204 174h30" stroke="#f7f0ff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- brush -->
+  <rect x="205" y="205" width="60" height="26" rx="10" fill="#ffc24b" transform="rotate(-20 205 205)"/>
+  <circle cx="225" cy="190" r="4" fill="#fff8ec"/>
+  <circle cx="235" cy="196" r="4" fill="#fff8ec"/>
+  <circle cx="245" cy="202" r="4" fill="#fff8ec"/>
+  <!-- fur wisps -->
+  <path d="M235 175q4-10 12-8" stroke="#f7f0ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M245 182q4-10 12-6" stroke="#f7f0ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>
