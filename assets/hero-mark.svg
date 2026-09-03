@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220">
+  <!-- cape -->
+  <path d="M108 60c-30 4-52 30-50 64 20-18 34-24 46-24s26 6 46 24c2-34-20-60-42-64z" fill="#ffc24b" stroke="#241f5c" stroke-width="4" stroke-linejoin="round"/>
+  <!-- body -->
+  <path d="M70 120c0-26 18-42 40-42s40 16 40 42v34c0 16-14 26-40 26s-40-10-40-26v-34z" fill="#241f5c"/>
+  <!-- chest star -->
+  <path d="M110 128l5 10 11 1-8 8 2 11-10-6-10 6 2-11-8-8 11-1z" fill="#ffc24b"/>
+  <!-- front legs -->
+  <rect x="80" y="168" width="16" height="26" rx="8" fill="#241f5c"/>
+  <rect x="124" y="168" width="16" height="26" rx="8" fill="#241f5c"/>
+  <!-- head -->
+  <circle cx="110" cy="66" r="40" fill="#241f5c"/>
+  <!-- ears -->
+  <path d="M76 42c-14-10-28-8-32 4-4 12 6 24 20 26 6-12 8-22 12-30z" fill="#241f5c"/>
+  <path d="M144 42c14-10 28-8 32 4 4 12-6 24-20 26-6-12-8-22-12-30z" fill="#241f5c"/>
+  <!-- snout -->
+  <ellipse cx="110" cy="82" rx="20" ry="14" fill="#f7f0ff"/>
+  <circle cx="110" cy="80" r="5" fill="#241f5c"/>
+  <path d="M110 85v6" stroke="#241f5c" stroke-width="3" stroke-linecap="round"/>
+  <path d="M100 96q10 8 20 0" stroke="#241f5c" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- eyes -->
+  <circle cx="92" cy="60" r="6" fill="#fff"/>
+  <circle cx="128" cy="60" r="6" fill="#fff"/>
+  <circle cx="93" cy="61" r="3" fill="#241f5c"/>
+  <circle cx="129" cy="61" r="3" fill="#241f5c"/>
+  <!-- mask -->
+  <path d="M74 52c10-8 24-10 36-10s26 2 36 10c-4 10-18 16-36 16s-32-6-36-16z" fill="#a98cf5" opacity=".55"/>
+</svg>

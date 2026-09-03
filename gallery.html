@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gallery — Pet Hero Mobile Grooming</title>
+<meta name="description" content="A peek inside the Pet Hero grooming van and the pets we've pampered across Beirut." />
+<meta property="og:title" content="Pet Hero Gallery" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="/assets/og-image.svg" />
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<header class="site-header" id="header">
+  <div class="container header-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-badge"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 12c6 0 11 5 12 11-4-2-9-1-12 2-3-3-4-8 0-13z" fill="#241f5c"/><path d="M22 26c4-6 12-8 18-4 5 3 7 9 5 15-8 4-18 2-23-4-3-3-3-5 0-7z" fill="#241f5c"/></svg></span>
+      <span class="brand-text">Pet Hero</span>
+    </a>
+    <nav class="nav" id="nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="services.html">Services</a>
+      <a href="gallery.html" class="active" aria-current="page">Gallery</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <a class="btn btn-primary header-cta" href="https://wa.me/96179450883" target="_blank" rel="noopener">Book on WhatsApp</a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false"><span></span><span></span><span></span></button>
+  </div>
+</header>
+
+<section class="subhero">
+  <div class="hero-blob blob-1" data-parallax="0.1" style="width:340px;height:340px;top:-140px;left:-120px;"></div>
+  <div class="hero-blob blob-2" data-parallax="0.18" style="width:220px;height:220px;bottom:-100px;right:-60px;"></div>
+  <div class="container" data-reveal>
+    <p class="eyebrow">📸 Gallery</p>
+    <h1>A peek inside the van.</h1>
+    <p>Real photos are on the way — for now, here's the Pet Hero look. Drop images in <code>assets/images/gallery/</code> and we'll bring this to life.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="gallery-grid" data-reveal-group>
+      <div class="gallery-tile tile-lg" data-reveal="scale" style="--i:0">
+        <svg viewBox="0 0 300 220" aria-hidden="true"><rect width="300" height="220" fill="#f1e9ff"/><rect x="30" y="90" width="200" height="80" rx="10" fill="#a98cf5"/><circle cx="70" cy="175" r="16" fill="#241f5c"/><circle cx="200" cy="175" r="16" fill="#241f5c"/><rect x="150" y="60" width="80" height="45" rx="8" fill="#cabbf9"/><path d="M170 70c6-8 18-8 22 0" stroke="#241f5c" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+        <span>The Pet Hero Van</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:1">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#ffc24b"/><circle cx="100" cy="90" r="45" fill="#241f5c"/><ellipse cx="80" cy="80" rx="7" ry="10" fill="#fff"/><ellipse cx="120" cy="80" rx="7" ry="10" fill="#fff"/></svg>
+        <span>Bath Time</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:2">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#a98cf5"/><path d="M60 140c10-40 30-70 40-70s30 30 40 70" stroke="#241f5c" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="100" cy="60" r="14" fill="#241f5c"/></svg>
+        <span>Breed-Specific Cuts</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:3">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#cabbf9"/><circle cx="100" cy="100" r="55" fill="none" stroke="#241f5c" stroke-width="10"/><path d="M80 100l15 15 30-30" stroke="#241f5c" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Happy, Healthy Coats</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:4">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#f1e9ff"/><circle cx="100" cy="100" r="40" fill="#a98cf5"/><circle cx="80" cy="90" r="8" fill="#241f5c"/><circle cx="120" cy="90" r="8" fill="#241f5c"/><path d="M85 115q15 12 30 0" stroke="#241f5c" stroke-width="5" fill="none" stroke-linecap="round"/></svg>
+        <span>Every Pet Welcome</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:5">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#ffc24b"/><path d="M100 40l14 30 33 5-24 23 6 33-29-16-29 16 6-33-24-23 33-5z" fill="#241f5c"/></svg>
+        <span>5-Star Grooms</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:6">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#241f5c"/><circle cx="100" cy="100" r="46" fill="#a98cf5"/><ellipse cx="85" cy="92" rx="7" ry="10" fill="#fff"/><ellipse cx="115" cy="92" rx="7" ry="10" fill="#fff"/><path d="M85 118q15 10 30 0" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+        <span>Before &amp; After</span>
+      </div>
+      <div class="gallery-tile" data-reveal="scale" style="--i:7">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><rect width="200" height="200" fill="#a98cf5"/><rect x="55" y="70" width="90" height="60" rx="14" fill="#241f5c"/><circle cx="80" cy="150" r="14" fill="#241f5c"/><circle cx="120" cy="150" r="14" fill="#241f5c"/></svg>
+        <span>Grooming Tools</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="container">
+    <div class="cta-banner" data-reveal="scale">
+      <h2>Want to be featured next?</h2>
+      <p>Book a groom and tag us — your pet could be the next Pet Hero.</p>
+      <a class="btn btn-primary btn-lg" href="https://www.instagram.com/pethero.lb" target="_blank" rel="noopener">Follow on Instagram</a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="brand footer-brand">
+      <span class="brand-badge small"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 12c6 0 11 5 12 11-4-2-9-1-12 2-3-3-4-8 0-13z" fill="#241f5c"/><path d="M22 26c4-6 12-8 18-4 5 3 7 9 5 15-8 4-18 2-23-4-3-3-3-5 0-7z" fill="#241f5c"/></svg></span>
+      <span class="brand-text">Pet Hero</span>
+    </div>
+    <p>Mobile pet grooming van serving Beirut, Lebanon.</p>
+    <p class="footer-copy">&copy; <span id="year"></span> Pet Hero Grooming Van. All rights reserved.</p>
+  </div>
+</footer>
+
+<a class="whatsapp-fab" href="https://wa.me/96179450883" target="_blank" rel="noopener" aria-label="Message us on WhatsApp">
+  <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.28-1.38a9.9 9.9 0 0 0 4.76 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm5.8 14.16c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.13.11-1.82-.11-.42-.13-.96-.31-1.65-.6-2.9-1.25-4.79-4.17-4.94-4.36-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.78-.36.2 0 .39 0 .56.01.18.01.42-.07.66.5.24.6.83 2.07.9 2.22.07.15.12.32.02.52-.1.2-.15.32-.3.49-.15.17-.31.38-.44.51-.15.15-.3.31-.13.6.17.29.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.35 1.46.29.15.46.13.63-.08.17-.2.72-.84.92-1.13.2-.29.39-.24.66-.14.27.1 1.72.81 2.02.96.29.15.49.22.56.34.07.13.07.75-.17 1.43z"/></svg>
+</a>
+
+<script src="/script.js"></script>
+</body>
+</html>
