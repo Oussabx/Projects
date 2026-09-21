@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ARTIFACT-HEAD-START -->
+<title>LinkedOut</title>
+<meta name="description" content="The world's largest professional de-networking platform. Resign from jobs you never had.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=Caveat:wght@600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+<!-- ARTIFACT-HEAD-END -->
+</head>
+<body>
+<!-- ARTIFACT-BODY-START -->
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-esc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 16 16 8M10 8h6v6"/>
+    </symbol>
+    <symbol id="i-feed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h10M7 17h7"/>
+    </symbol>
+    <symbol id="i-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2.5" y="7" width="19" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M9.5 15.5 14 11m-3.2 0H14v3.2"/>
+    </symbol>
+    <symbol id="i-letter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>
+    </symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#" aria-label="LinkedOut home">
+      <span class="brand-word">Linked</span><span class="brand-box">Out<svg class="esc" aria-hidden="true"><use href="#i-esc"/></svg></span>
+    </a>
+
+    <div class="search">
+      <label class="sr-only" for="q">Search jobs you can quit</label>
+      <input id="q" type="search" autocomplete="off" placeholder="Search jobs you can quit">
+      <div class="search-pop" id="searchPop" hidden>
+        <b>Everyone is searching for</b>
+        <ul>
+          <li>how to quit politely</li>
+          <li>how to quit impolitely</li>
+          <li>is it illegal to simply stop going</li>
+          <li>severance (the show)</li>
+          <li>severance (the money)</li>
+        </ul>
+        <div class="none" id="searchNone">0 results. You are not qualified — but more importantly, you are not interested.</div>
+      </div>
+    </div>
+
+    <nav class="nav" role="tablist" aria-label="Sections">
+      <button role="tab" id="tab-feed" aria-controls="panel-feed" aria-selected="true" data-tab="feed">
+        <svg aria-hidden="true"><use href="#i-feed"/></svg><span>Feed</span>
+      </button>
+      <button role="tab" id="tab-jobs" aria-controls="panel-jobs" aria-selected="false" data-tab="jobs">
+        <svg aria-hidden="true"><use href="#i-board"/></svg><span>Quit Board</span>
+      </button>
+      <button role="tab" id="tab-lab" aria-controls="panel-lab" aria-selected="false" data-tab="lab">
+        <svg aria-hidden="true"><use href="#i-letter"/></svg><span>Letter Lab</span>
+      </button>
+      <button id="bellBtn" aria-expanded="false" aria-controls="notePop" aria-label="Alerts">
+        <svg aria-hidden="true"><use href="#i-bell"/></svg><span>Alerts</span>
+        <em class="badge" id="bellCount">4</em>
+      </button>
+    </nav>
+
+    <div class="note-pop" id="notePop" hidden>
+      <div class="card-h"><h3>Alerts</h3><span class="eyebrow">All bad</span></div>
+      <div class="notes" id="notePopList"></div>
+    </div>
+  </div>
+</header>
+
+<main class="shell">
+
+  <!-- ============ LEFT RAIL ============ -->
+  <aside class="rail rail-left">
+    <section class="card">
+      <div class="cover"></div>
+      <div class="pf">
+        <div class="avatar" id="avatarMain" aria-hidden="true">YN</div>
+        <div class="open-to">#OpenToNothing</div>
+        <label class="sr-only" for="nameInput">Your name</label>
+        <input class="pf-name-input" id="nameInput" value="Your Name Here" maxlength="28" spellcheck="false">
+        <p class="pf-head">Former Everything at Nowhere · Ex-Human · Recovering Synergist</p>
+        <p class="pf-loc">Currently horizontal · Open to nothing</p>
+
+        <div class="stats">
+          <div class="stat"><span>Jobs resigned</span><b id="sJobs">0</b></div>
+          <div class="stat"><span>Letters filed</span><b id="sLetters">0</b></div>
+          <div class="stat"><span>Bridges burned</span><b id="sBridges">3</b></div>
+          <div class="stat"><span>Un-endorsements</span><b id="sUn">47</b></div>
+          <div class="stat"><span>Profile views</span><b class="good" id="sViews">0</b></div>
+        </div>
+
+        <div class="streak">
+          <span class="eyebrow">Unemployment streak</span>
+          <div class="streak-val" id="streak">0d 00h 00m 00s</div>
+          <button id="gotJob" type="button">I got a job →</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3>Unskills</h3><span class="eyebrow">▼ declining</span></div>
+      <div class="card-b" id="unskills">
+        <div class="unskill" data-now="4" data-was="61"><div class="unskill-t"><b>Replying to emails</b><i>4% ▼</i></div><div class="track"><i style="width:4%"></i><span class="was" style="left:61%"></span></div></div>
+        <div class="unskill" data-now="11" data-was="88"><div class="unskill-t"><b>Showing up</b><i>11% ▼</i></div><div class="track"><i style="width:11%"></i><span class="was" style="left:88%"></span></div></div>
+        <div class="unskill" data-now="62" data-was="64"><div class="unskill-t"><b>Pretending to care</b><i>62% ▼</i></div><div class="track"><i style="width:62%"></i><span class="was" style="left:64%"></span></div></div>
+        <div class="unskill" data-now="0" data-was="47"><div class="unskill-t"><b>Conflict resolution</b><i>0% ▼</i></div><div class="track"><i style="width:2%"></i><span class="was" style="left:47%"></span></div></div>
+        <div class="unskill" data-now="1" data-was="1"><div class="unskill-t"><b>Microsoft Excel</b><i>1% —</i></div><div class="track"><i style="width:2%"></i><span class="was" style="left:1%"></span></div></div>
+        <p class="unskill-note">Conflict <em>creation</em> holds steady at 94%. Un-endorsed by 4 people, including your own mother.</p>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ CENTER ============ -->
+  <div class="col">
+
+    <!-- ---------- FEED ---------- -->
+    <section id="panel-feed" role="tabpanel" aria-labelledby="tab-feed">
+      <div class="col">
+        <div class="card">
+          <div class="composer">
+            <div class="avatar" id="avatarComposer" aria-hidden="true">YN</div>
+            <button type="button" data-goto="lab">Start a resignation…</button>
+          </div>
+        </div>
+
+        <div id="feed" class="col">
+
+          <article class="card post">
+            <div class="post-h">
+              <div class="avatar" aria-hidden="true">DB</div>
+              <div class="post-who">
+                <b>Dale Brenner</b>
+                <span>Formerly Formerly · Ex-Everything at Ex-Everywhere</span>
+                <time>4h · edited 19 times</time>
+              </div>
+            </div>
+<div class="post-body">I'm humbled and devastated to announce that I have resigned from a position I was never actually offered.
+
+It wasn't an easy decision. Mostly because nobody asked me to make it.<span class="rest" hidden>
+
+Fourteen months ago I walked into that interview with a dream. The dream was parking validation. They did not validate. So I did not stay.
+
+Here is what fourteen months of not working there taught me:
+
+1. Your worth is not defined by your job title.
+2. It is defined by how loudly you announce leaving it.
+3. There is no third one. I just needed the list to look like a list.
+
+Grateful to everyone who made this possible, which is nobody.
+
+<span class="tags">#OpenToNothing #Humbled #Unhired</span></span> <button class="more" type="button">…see more</button></div>
+            <div class="post-count"><span>2,481 unlikes</span><span>·</span><span>96 comments</span><span>·</span><span>0 job offers</span></div>
+            <div class="react"></div>
+            <div class="comment">
+              <div class="avatar" aria-hidden="true">GT</div>
+              <div class="comment-b"><b>Greg Tamblin <i>· Congratulator</i></b><p>Congrats!! 🎉 So well deserved 🙌</p></div>
+            </div>
+          </article>
+
+          <article class="card post">
+            <div class="post-h">
+              <div class="avatar" aria-hidden="true">PO</div>
+              <div class="post-who">
+                <b>Priya Okonkwo</b>
+                <span>Chief Nothing Officer · Formerly Busy</span>
+                <time>9h</time>
+              </div>
+            </div>
+<div class="post-body">Day 1 of unemployment: cried.
+Day 2 of unemployment: cried, but efficiently.
+Day 3: I have optimised the crying pipeline and cut tear latency by 40%.<span class="rest" hidden>
+
+Day 4: Crying now runs in the background. I've containerised it.
+Day 5: Sobbing is fully automated and scales horizontally.
+Day 6: A recruiter asked what I'd been working on. I showed her the dashboard. She has not replied.
+
+Still unemployed. But look at these metrics. Look at them.
+
+<span class="tags">#Growth #Velocity #NothingShipped</span></span> <button class="more" type="button">…see more</button></div>
+            <div class="post-count"><span>1,207 unlikes</span><span>·</span><span>41 comments</span><span>·</span><span>1 concerned DM</span></div>
+            <div class="react"></div>
+            <div class="comment">
+              <div class="avatar" aria-hidden="true">GT</div>
+              <div class="comment-b"><b>Greg Tamblin <i>· Congratulator</i></b><p>Congrats!! 🎉 Huge 🙌</p></div>
+            </div>
+          </article>
+
+          <article class="card post">
+            <div class="post-h">
+              <div class="avatar" aria-hidden="true">CV</div>
+              <div class="post-who">
+                <b>Chad Vance</b>
+                <span>Talent Un-Acquisition Specialist at Synergaze</span>
+                <time>1d · promoted, somehow</time>
+              </div>
+            </div>
+<div class="post-body">🚨 WE ARE NOT HIRING 🚨
+
+Role: none
+Salary: also none
+Location: please stop
+
+We're looking for someone who isn't passionate, doesn't want to grow, and has no interest whatsoever in wearing many hats.<span class="rest" hidden>
+
+The ideal candidate does not apply. The ideal candidate has never heard of us. The ideal candidate is asleep right now and will remain so.
+
+If this sounds like you, do nothing at all. We'll do nothing right back. That's the culture.
+
+DM me and I will not respond. That is also the culture.
+
+<span class="tags">#NotHiring #NeverHiring #PleaseStop</span></span> <button class="more" type="button">…see more</button></div>
+            <div class="post-count"><span>8,904 unlikes</span><span>·</span><span>312 applications (ignored)</span></div>
+            <div class="react"></div>
+          </article>
+
+          <article class="card post">
+            <div class="post-h">
+              <div class="avatar" aria-hidden="true">MA</div>
+              <div class="post-who">
+                <b>Marguerite Aylesworth</b>
+                <span>1,204 days unemployed · Streak holder · Do not contact</span>
+                <time>1d</time>
+              </div>
+            </div>
+<div class="post-body">Just hit 1,204 consecutive days of not going to work.
+
+People said it couldn't be done. Mostly my landlord. He says it a lot. He says it through the door.</div>
+            <div class="post-count"><span>5,610 unlikes</span><span>·</span><span>203 comments</span></div>
+            <div class="react"></div>
+            <div class="comment">
+              <div class="avatar" aria-hidden="true">YL</div>
+              <div class="comment-b"><b>Your Landlord <i>· 2nd</i></b><p>we need to talk</p></div>
+            </div>
+          </article>
+
+          <article class="card post">
+            <div class="post-h">
+              <div class="avatar" aria-hidden="true">TR</div>
+              <div class="post-who">
+                <b>Tobias Rourke</b>
+                <span>Ex-Synergaze · Ex-Blandscape · Ex-Adjacent</span>
+                <time>2d</time>
+              </div>
+            </div>
+<div class="post-body">Someone asked me at a party what I do.
+
+I said "as little as possible."
+They said "no, I mean for work."
+I said "yes."
+
+We stood there for a while. It was the most honest conversation I've had since 2019.</div>
+            <div class="post-count"><span>3,318 unlikes</span><span>·</span><span>77 comments</span></div>
+            <div class="react"></div>
+            <div class="comment">
+              <div class="avatar" aria-hidden="true">GT</div>
+              <div class="comment-b"><b>Greg Tamblin <i>· Congratulator</i></b><p>Congrats!! 🎉</p></div>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- QUIT BOARD ---------- -->
+    <section id="panel-jobs" role="tabpanel" aria-labelledby="tab-jobs" hidden>
+      <div class="card">
+        <div class="card-h">
+          <h2>The Quit Board</h2>
+          <span class="eyebrow" id="quitTally">8 open exits</span>
+        </div>
+        <div class="filters" role="group" aria-label="Filter by arrangement">
+          <button class="chip" data-filter="all" aria-pressed="true">All exits</button>
+          <button class="chip" data-filter="remote" aria-pressed="false">Remote</button>
+          <button class="chip" data-filter="hybrid" aria-pressed="false">Hybrid</button>
+          <button class="chip" data-filter="onsite" aria-pressed="false">In-person (against your will)</button>
+          <button class="chip" data-filter="unpaid" aria-pressed="false">Unpaid but great exposure</button>
+        </div>
+
+        <div id="jobs">
+          <div class="job" data-mode="remote" data-id="synergaze" data-q="8412">
+            <div class="logo">SY</div>
+            <div>
+              <div class="job-t">Senior Vibes Architect</div>
+              <div class="job-c">Synergaze · Remote (spiritually)</div>
+              <div class="job-m">Posted 4 years ago · Still posted</div>
+              <p class="job-d">"We're not a company, we're a family." A family that does not call you back.</p>
+              <div class="job-n"><b class="qc">8,412</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="hybrid" data-id="blandscape" data-q="6109">
+            <div class="logo">BL</div>
+            <div>
+              <div class="job-t">Head of Thought Leadership</div>
+              <div class="job-c">Blandscape · Hybrid (worst of both)</div>
+              <div class="job-m">Reports to: a vibe</div>
+              <p class="job-d">Must say "let's circle back" 200 times a day without flinching, blinking or weeping.</p>
+              <div class="job-n"><b class="qc">6,109</b> resignations · 2 applicants (in error)</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="unpaid" data-id="momentum" data-q="11876">
+            <div class="logo">MO</div>
+            <div>
+              <div class="job-t">Junior Executive Vice Intern</div>
+              <div class="job-c">Momentum Holdings · Unpaid but great exposure</div>
+              <div class="job-m">Requires 8 years experience · Entry level</div>
+              <p class="job-d">Competitive salary of experience. Dental: also experience. Equity: a firm handshake.</p>
+              <div class="job-n"><b class="qc">11,876</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="onsite" data-id="vertical" data-q="9430">
+            <div class="logo">VP</div>
+            <div>
+              <div class="job-t">Chief Meeting Attendance Officer</div>
+              <div class="job-c">Vertical Pivot · In-person (against your will)</div>
+              <div class="job-m">Hours: 9:00–9:00 · Lunch: during a call</div>
+              <p class="job-d">This meeting could have been you not being here.</p>
+              <div class="job-n"><b class="qc">9,430</b> resignations · 1 applicant (lost)</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="remote" data-id="dataraven" data-q="7245">
+            <div class="logo">DA</div>
+            <div>
+              <div class="job-t">Full-Stack Human</div>
+              <div class="job-c">Dataraven · Remote (timezone: ours)</div>
+              <div class="job-m">Must be a rockstar ninja wizard unicorn</div>
+              <p class="job-d">15 years experience required with a framework released in 2023. Please explain the gap.</p>
+              <div class="job-n"><b class="qc">7,245</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="hybrid" data-id="peakwise" data-q="4870">
+            <div class="logo">PE</div>
+            <div>
+              <div class="job-t">Director of Saying "Great Question"</div>
+              <div class="job-c">Peakwise · Hybrid</div>
+              <div class="job-m">No answering required</div>
+              <p class="job-d">You will never answer the question. You will simply say that it is a great one, and then look at a slide.</p>
+              <div class="job-n"><b class="qc">4,870</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="onsite" data-id="brightstone" data-q="10233">
+            <div class="logo">BR</div>
+            <div>
+              <div class="job-t">Morale Officer (Mandatory Fun)</div>
+              <div class="job-c">Brightstone · In-person (against your will)</div>
+              <div class="job-m">Reports to: the cake</div>
+              <p class="job-d">Hours are whenever spirits are low, which is constantly, which is because of the cake.</p>
+              <div class="job-n"><b class="qc">10,233</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+
+          <div class="job" data-mode="unpaid" data-id="stealth" data-q="15901">
+            <div class="logo">ST</div>
+            <div>
+              <div class="job-t">Unpaid Founder of Something</div>
+              <div class="job-c">Stealth Mode · Unpaid but great exposure</div>
+              <div class="job-m">Stealth even to us</div>
+              <p class="job-d">Equity: vibes. Vesting schedule: never. Runway: you, personally, financially.</p>
+              <div class="job-n"><b class="qc">15,901</b> resignations · 0 applicants</div>
+            </div>
+            <div class="job-act"><button class="resign" type="button">Resign</button></div>
+          </div>
+        </div>
+
+        <div class="card-f">Every listing is permanently open. Nobody has ever been hired. The resignations, however, keep coming.</div>
+      </div>
+    </section>
+
+    <!-- ---------- LETTER LAB ---------- -->
+    <section id="panel-lab" role="tabpanel" aria-labelledby="tab-lab" hidden>
+      <div class="col">
+        <div class="card">
+          <div class="card-h"><h2>Letter Lab</h2><span class="eyebrow">Resignation generator</span></div>
+          <div class="lab">
+            <div class="row2">
+              <div class="field">
+                <label for="fCompany">Company you're leaving</label>
+                <input id="fCompany" value="Synergaze" maxlength="34" spellcheck="false">
+              </div>
+              <div class="field">
+                <label for="fTenure">Time served</label>
+                <select id="fTenure">
+                  <option>four minutes</option>
+                  <option>one (1) onboarding session</option>
+                  <option>a single trial shift</option>
+                  <option selected>two quarters and one panic attack</option>
+                  <option>three years I will not be getting back</option>
+                  <option>eleven years, somehow</option>
+                  <option>a period I am legally advised not to describe</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="fReason">Final straw</label>
+              <select id="fReason">
+                <option value="chair">The chair</option>
+                <option value="family" selected>They called it "a family"</option>
+                <option value="fun">Mandatory fun</option>
+                <option value="fridge">The fridge situation</option>
+                <option value="slack">Messages at 11:47pm</option>
+                <option value="offline">Someone said "let's take this offline" during an offline meeting</option>
+                <option value="title">I was promoted into a title I cannot pronounce</option>
+                <option value="openplan">The open-plan office</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label id="toneLabel">Tone</label>
+              <div class="tones" role="group" aria-labelledby="toneLabel">
+                <button class="tone" data-tone="poetry" aria-pressed="true" type="button">Corporate Poetry</button>
+                <button class="tone" data-tone="passive" aria-pressed="false" type="button">Passive Aggressive</button>
+                <button class="tone" data-tone="scorched" aria-pressed="false" type="button">Scorched Earth</button>
+                <button class="tone" data-tone="influencer" aria-pressed="false" type="button">LinkedOut Influencer</button>
+                <button class="tone" data-tone="sincere" aria-pressed="false" type="button">Unhinged Sincerity</button>
+              </div>
+              <p class="tone-note" id="toneNote">Says nothing, beautifully. HR will frame it.</p>
+            </div>
+
+            <div class="lab-actions">
+              <button class="btn" id="genBtn" type="button">Draft my resignation <svg class="esc" aria-hidden="true"><use href="#i-esc"/></svg></button>
+              <button class="btn ghost" id="copyBtn" type="button">Copy letter</button>
+              <button class="btn ghost" id="postBtn" type="button">Post to feed</button>
+            </div>
+          </div>
+
+          <div class="sheet-wrap">
+            <div class="sheet" id="sheet">
+              <div class="ring" aria-hidden="true"></div>
+              <div class="sheet-date" id="sheetDate">Today</div>
+              <div id="sheetBody">
+                <p>Dear Synergaze,</p>
+                <p>Every journey has a runway. Mine has been deprioritised in this quarter's roadmap, moved to the backlog, and quietly archived by someone who does not know my name.</p>
+                <p>After two quarters and one panic attack, I am leaving. You said we were a family. I have a family. They do not make me fill in a timesheet to attend my grandmother's funeral.</p>
+                <p>I want to be clear that this is not a negotiation tactic. There is nothing you could offer me. I checked. I made a list. The list said "nothing."</p>
+                <p>Please consider this my notice, my exit interview, and my final deliverable, submitted on time for the first time.</p>
+                <div class="sig" id="sheetSig">Your Name Here</div>
+                <div class="sig-line" id="sheetSigLine">Your Name Here · Formerly of Synergaze</div>
+                <p class="ps" id="sheetPs">P.S. The mug was mine. The plant was mine. The feelings were mine. I have taken all three.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ RIGHT RAIL ============ -->
+  <aside class="rail rail-right">
+    <section class="card">
+      <div class="card-h"><h3>Alerts</h3><span class="eyebrow">All bad</span></div>
+      <div class="notes" id="noteList">
+        <div class="note" data-new="1"><span class="dot"></span><div><b>Your former manager</b> viewed your resignation letter 47 times. He has opened nothing else today.<time>12m</time></div></div>
+        <div class="note" data-new="1"><span class="dot"></span><div><b>Greg Tamblin</b> congratulated you on leaving. Greg congratulates everything. Greg congratulated a funeral in March.<time>1h</time></div></div>
+        <div class="note" data-new="1"><span class="dot"></span><div><b>3 people you have never met</b> un-endorsed you for Teamwork.<time>3h</time></div></div>
+        <div class="note" data-new="1"><span class="dot"></span><div><b>Synergaze</b> is still not hiring you. This is your weekly reminder, as requested.<time>8h</time></div></div>
+        <div class="note" data-new="0"><span class="dot"></span><div>You appeared in <b>0 searches</b> this week. Down 0%. You have achieved perfect invisibility.<time>1d</time></div></div>
+        <div class="note" data-new="0"><span class="dot"></span><div>A recruiter began typing a message to you, then thought better of it.<time>2d</time></div></div>
+        <div class="note" data-new="0"><span class="dot"></span><div>Your unskill <b>Punctuality</b> has decayed to 2%. Genuinely impressive.<time>3d</time></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3>LinkedOut Prestige</h3><span class="eyebrow">Pay to vanish</span></div>
+      <div class="tier">
+        <div class="tier-h"><b>Free</b><span>$0</span></div>
+        <p>Everyone can find you. Unfortunately.</p>
+        <button type="button" data-tier="Free">Continue suffering</button>
+      </div>
+      <div class="tier" data-best="1">
+        <span class="flag">Most popular way to lose money</span>
+        <div class="tier-h"><b>Prestige</b><span>$29/mo</span></div>
+        <p>Recruiters see only a blurred silhouette and a faint sense of disappointment.</p>
+        <button type="button" data-tier="Prestige">Become vague</button>
+      </div>
+      <div class="tier">
+        <div class="tier-h"><b>Ghost</b><span>$99/mo</span></div>
+        <p>Removed from all search results, all databases, and gradually from photographs.</p>
+        <button type="button" data-tier="Ghost">Cease</button>
+      </div>
+      <div class="card-f">Prices rise the less of you there is.</div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h3>Un-network</h3><span class="eyebrow">People to avoid</span></div>
+      <div class="card-b">
+        <div class="stat"><span>Greg Tamblin · Congratulator</span><b class="good">Avoid</b></div>
+        <div class="stat"><span>A recruiter named Chad</span><b class="good">Avoid</b></div>
+        <div class="stat"><span>Your former manager</span><b class="good">Block</b></div>
+        <div class="stat"><span>Your landlord</span><b>Answer</b></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer class="foot">
+  <button class="nuke" id="nukeBtn" type="button">Resign from absolutely everything at once</button>
+  <div class="foot-links">
+    <a href="#">About</a>
+    <a href="#">Careers (none)</a>
+    <a href="#">Press (please don't)</a>
+    <a href="#">Accessibility</a>
+    <a href="#">Privacy (we have yours)</a>
+    <a href="#">Terms of Disengagement</a>
+  </div>
+  <p class="fine">LinkedOut is a parody and is not affiliated with any professional networking platform, several of which have politely asked us to stop. No job listed here is real. No resignation issued here is legally binding. If you have genuinely resigned on the strength of this website, that is between you and the chair.</p>
+</footer>
+
+<div class="toaster" id="toaster" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+<!-- ARTIFACT-BODY-END -->
+</body>
+</html>
