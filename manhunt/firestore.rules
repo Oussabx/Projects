@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    match /lobbies/{code} {
+      // Anyone signed in can look up a lobby by code and create one.
+      allow read, create: if signedIn();
+      // Only members may change a lobby; the only change a non-member may make
+      // is adding themselves (joining).
+      allow update: if signedIn() && (
+        request.auth.uid in resource.data.players ||
+        (resource.data.status == 'lobby' &&
+         request.resource.data.players.keys().removeAll(resource.data.players.keys()).hasOnly([request.auth.uid]))
+      );
+      allow delete: if signedIn() && request.auth.uid in resource.data.players;
+
+      // Location pins: readable by lobby members, written only by the runner themselves.
+      match /pings/{pingId} {
+        allow read: if signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/lobbies/$(code)).data.players;
+        allow create, update: if signedIn() &&
+          request.resource.data.playerId == request.auth.uid &&
+          request.auth.uid in get(/databases/$(database)/documents/lobbies/$(code)).data.players;
+      }
+    }
+
+    // Scratch doc for measuring clock offset.
+    match /clocks/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+  }
+}
