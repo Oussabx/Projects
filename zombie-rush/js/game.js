@@ -9,8 +9,9 @@ const Game = (() => {
   const RANGE = 13;        // bullets fade out here, so fights happen mid-screen
   const RUN_SPEED = 2;        // you creep forward; enemies walk to you
   const MAX_SHOTS = 5;
-  const MAX_SQUAD = 150;
-  const SHOW_SQUAD = 80;    // soldiers drawn; the rest are only counted
+  const MAX_SQUAD = 500;
+  const SHOW_SQUAD = 130;   // soldiers drawn; the rest are only counted
+  const XS = 1.32;          // horizontal stretch: wider road without bigger characters
   const MAX_VOLLEY = 40;    // bullets drawn per volley
 
   let canvas, ctx, W = 0, H = 0, roadW = 0, baseY = 0, horizon = 0;
@@ -46,7 +47,7 @@ const Game = (() => {
     });
     canvas.addEventListener('pointermove', e => {
       if (!run || !dragStart) return;
-      run.targetX = clamp(dragStart.x + (e.clientX - dragStart.px) / (roadW * 0.75), -0.85, 0.85);
+      run.targetX = clamp(dragStart.x + (e.clientX - dragStart.px) / (roadW * XS * 0.75), -0.85, 0.85);
     });
     const endDrag = () => { dragStart = null; };
     canvas.addEventListener('pointerup', endDrag);
@@ -83,7 +84,7 @@ const Game = (() => {
 
   function proj(x, z) {
     const s = CAM_D / (z + CAM_D);
-    return { x: W / 2 + x * roadW * s, y: horizon + (baseY - horizon) * s, s };
+    return { x: W / 2 + x * XS * roadW * s, y: horizon + (baseY - horizon) * s, s };
   }
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -351,8 +352,8 @@ const Game = (() => {
   function layoutSquad(dt) {
     const r = run;
     const n = Math.min(r.squad, SHOW_SQUAD);
-    const cols = Math.min(9, Math.max(3, Math.ceil(Math.sqrt(n * 1.8))));
-    const sp = 0.19;
+    const cols = Math.min(10, Math.max(3, Math.ceil(Math.sqrt(n * 2))));
+    const sp = 0.14;
     r.hw = n ? (Math.min(n, cols) - 1) * sp / 2 + 0.08 : 0;
     const tx = clamp(r.x, -0.95 + r.hw, 0.95 - r.hw);
     r.cx += (tx - r.cx) * Math.min(1, dt * 9);
@@ -362,7 +363,7 @@ const Game = (() => {
       const row = Math.floor(i / cols), col = i % cols;
       const inRow = Math.min(cols, n - row * cols);
       const jx = Math.sin(i * 12.9898) * 0.025, jz = Math.cos(i * 78.233) * 0.05;
-      slots[i] = { x: r.cx + (col - (inRow - 1) / 2) * sp + jx, z: -0.55 - row * 0.3 + jz, ph: i * 1.7 };
+      slots[i] = { x: r.cx + (col - (inRow - 1) / 2) * sp + jx, z: -0.55 - row * 0.26 + jz, ph: i * 1.7 };
     }
   }
 
