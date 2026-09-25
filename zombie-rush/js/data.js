@@ -57,11 +57,12 @@ const CHAPTERS = [
     id: 'ch1',
     name: 'Dead City',
     theme: {
-      sky: ['#5a3fd6', '#ff6fae', '#ffc46b'], sun: 'rgba(255,240,180,.9)',
-      ground: ['#48b83e', '#56c94a'], shoulder: '#98a4ef', road: '#4a4d86',
-      curb: ['#ff4d5e', '#ffffff'], line: '#ffd35a',
+      sky: ['#4f8fe8', '#8fc4ff', '#d8ecff'], sun: 'rgba(255,250,220,.95)',
+      ground: ['#48b83e', '#56c94a'], shoulder: '#98a4ef', road: '#a7abb4',
+      curb: ['#ff4d5e', '#ffffff'], line: '#ffffff',
       skyline: ['#3b2a8f', '#4a35a8'], windows: '#ffd35a', menuGround: ['#7b86d6', '#5561b8'],
-      props: ['cone', 'crate', 'tires', 'hydrant', 'bush', 'bush', 'car'],
+      props: [],
+      bridge: true,
     },
     levels: [
       { name: 'Gas Station',  length: 200, zhp: 26, zdmg: 15, density: 1.0, power: 400, types: ['walker'],

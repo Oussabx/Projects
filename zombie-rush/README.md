@@ -17,6 +17,8 @@ Progress is saved in the browser's localStorage. You can wipe it from the Ranks 
 - **Chapter 1 "Dead City"** and **Chapter 2 "Scorched Highway"** (desert, unlocked by beating chapter 1): 6 levels each. Every level ends with a boss, and level 6 is the chapter boss. You earn 1–3 stars per level based on the HP you have left. Chapter 2 adds armored zombies (helmets) and bombers (fast, explode on contact).
 - **Chests you earn** are saved to the Battle screen until you open them.
 - **Sound:** soft synthesized SFX and music (Web Audio, no files). Tap your avatar for volume, name, credits, privacy and reset.
+- **Squad (like the ad):** a crowd of blue-helmet soldiers follows you and fires with you. Grow it by breaking barrels with soldiers on top and through `+N` / `x2` signs. Red `-N` signs and enemies that reach you cost soldiers; the leader only takes damage once the squad is gone.
+- **Enemy crowds** show a skull counter of how many are left, and kills build a big streak counter.
 - **In-level power-ups**
   - Gates: pick a side. `+1 GUN`, `DMG +x%`, `FIRE +x%` and `HEAL`. Red (bad) gates get better as you shoot them.
   - Barrels: shoot the number down to 0 for Shield, Rage (x2 fire), Medkit, Grenade (clears the screen) or Coins.

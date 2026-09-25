@@ -15,7 +15,7 @@ function defaultSave() {
     ],
     equipped: { helmet: 2, rifle: 1, gloves: null, scope: null },
     nextId: 3,
-    settings: { music: 0.5, sfx: 0.8 },
+    settings: { music: 0.5, sfx: 0.8, muted: false },
     progress: {
       ch1: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] },
       ch2: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] },

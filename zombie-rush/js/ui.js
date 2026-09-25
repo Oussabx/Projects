@@ -545,6 +545,7 @@ const UI = (() => {
       input.addEventListener('input', () => {
         input.style.setProperty('--fill', input.value + '%');
         save.settings[key] = input.value / 100;
+        save.settings.muted = false;
         $(`#set-${key}-v`).textContent = input.value;
         applySettings();
       });
@@ -557,7 +558,12 @@ const UI = (() => {
     $('#m-reset').onclick = confirmReset;
   }
 
-  function applySettings() { Sound.setVolumes(save.settings.music, save.settings.sfx); }
+  function applySettings() {
+    const st = save.settings;
+    Sound.setVolumes(st.muted ? 0 : st.music, st.muted ? 0 : st.sfx);
+    const m = document.getElementById('hud-mute');
+    if (m) m.innerHTML = icon(st.muted ? 'mute' : 'sound', '#fff');
+  }
 
   function subPage(title, body, ribbon) {
     sheet(title, `<div class="doc">${body}</div>
@@ -738,12 +744,13 @@ const UI = (() => {
   // ---------- Init ----------
 
   function init() {
-    const colors = { shop: '#ff5fb4', gear: '#5d8f46', play: '#ff8a1f', skills: '#ffc933', ranks: '#ffc933', heart: '#ff4d5e', skull: '#ffffff' };
+    const colors = { shop: '#ff5fb4', gear: '#5d8f46', play: '#ff8a1f', skills: '#ffc933', ranks: '#ffc933', heart: '#ff4d5e', skull: '#ffffff', helmet: '#2f8ff0' };
     document.querySelectorAll('[data-icon]').forEach(el => {
       const target = el.classList.contains('tab') ? el.querySelector('i') : el;
       target.innerHTML = icon(el.dataset.icon, colors[el.dataset.icon] || '#ffc933');
     });
     $('#hud-pause').innerHTML = icon('pause');
+    $('#hud-mute').addEventListener('click', () => { save.settings.muted = !save.settings.muted; persist(); applySettings(); });
     $('#hud-pause').addEventListener('click', () => togglePause());
     document.querySelectorAll('.navbar .tab').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.goto)));

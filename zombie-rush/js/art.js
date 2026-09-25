@@ -276,23 +276,38 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
 function drawBarrel(ctx, cx, footY, w, h, hp) {
   ctx.save();
   ctx.translate(cx, footY);
-  const lw = Math.max(1.5, w / 40);
+  const lw = Math.max(1.5, w / 36);
   ctx.fillStyle = 'rgba(0,0,0,.25)';
   ctx.beginPath(); ctx.ellipse(0, 0, w * 0.55, w * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-  rr(ctx, -w / 2, -h, w, h, w * 0.08); blob(ctx, '#d8322f', lw);
-  ctx.fillStyle = '#a81f22';
-  for (const f of [0.25, 0.75]) ctx.fillRect(-w / 2, -h * f - h * 0.04, w, h * 0.08);
-  ctx.fillStyle = 'rgba(255,255,255,.25)';
-  ctx.fillRect(-w * 0.38, -h * 0.95, w * 0.08, h * 0.85);
-  ctx.beginPath(); ctx.ellipse(0, -h, w / 2, w * 0.12, 0, 0, Math.PI * 2); blob(ctx, '#f0544f', lw);
-  ctx.fillStyle = '#fff';
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = Math.max(2, w / 18);
-  ctx.font = `900 ${Math.round(h * 0.34)}px "Lilita One", system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.strokeText(hp, 0, -h * 0.5);
-  ctx.fillText(hp, 0, -h * 0.5);
+  // Bulging wooden body
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.44, 0);
+  ctx.quadraticCurveTo(-w * 0.56, -h * 0.5, -w * 0.44, -h);
+  ctx.lineTo(w * 0.44, -h);
+  ctx.quadraticCurveTo(w * 0.56, -h * 0.5, w * 0.44, 0);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(-w / 2, 0, w / 2, 0);
+  g.addColorStop(0, '#9a5a2a'); g.addColorStop(0.35, '#d99a55'); g.addColorStop(1, '#8a4f22');
+  ctx.fillStyle = g; ctx.fill();
+  ctx.lineWidth = lw; ctx.strokeStyle = INK; ctx.stroke();
+  // Staves
+  ctx.strokeStyle = 'rgba(90,45,15,.45)'; ctx.lineWidth = lw * 0.7;
+  for (const f of [-0.25, 0, 0.25]) { ctx.beginPath(); ctx.moveTo(w * f, -h * 0.02); ctx.quadraticCurveTo(w * f * 1.2, -h * 0.5, w * f, -h * 0.98); ctx.stroke(); }
+  // Metal hoops
+  ctx.fillStyle = '#5b5f6e';
+  for (const f of [0.18, 0.82]) { ctx.beginPath(); ctx.ellipse(0, -h * f, w * 0.52, h * 0.05, 0, 0, Math.PI * 2); ctx.fill(); }
+  ctx.beginPath(); ctx.ellipse(0, -h, w * 0.44, w * 0.1, 0, 0, Math.PI * 2); blob(ctx, '#c98b4a', lw);
+  if (hp !== '') {
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = Math.max(2, w / 14);
+    ctx.lineJoin = 'round';
+    ctx.font = `900 ${Math.round(h * 0.36)}px "Lilita One", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeText(hp, 0, -h * 0.5);
+    ctx.fillText(hp, 0, -h * 0.5);
+  }
   ctx.restore();
 }
 
@@ -451,6 +466,86 @@ function drawDrum(ctx, cx, footY, h) {
   ctx.restore();
 }
 
+// ---------- Squad trooper (blue helmet, like the ad's crowd) ----------
+
+function drawTrooper(ctx, cx, footY, height, t, opts = {}) {
+  const { back = true, helmet = '#2f8ff0', flash = 0, phase = 0 } = opts;
+  const u = height / 100;
+  const step = Math.sin(t * 14 + phase);
+  ctx.save();
+  ctx.translate(cx, footY);
+  ctx.scale(u, u);
+  const lw = 3.2;
+  ctx.fillStyle = 'rgba(0,0,0,.22)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+  // Legs
+  for (const sgn of [-1, 1]) {
+    const lift = Math.max(0, step * sgn) * 6;
+    rr(ctx, sgn * 9 - 7, -28 - lift, 14, 22, 5); blob(ctx, '#2f5fb8', lw);
+    rr(ctx, sgn * 9 - 8, -10 - lift, 16, 10, 4); blob(ctx, '#23273a', lw);
+  }
+  const bob = Math.abs(step) * 2;
+  ctx.translate(0, -bob);
+  // Body: white tee
+  rr(ctx, -19, -58, 38, 32, 10); blob(ctx, flash > 0 ? '#ffe' : '#f4f6fb', lw);
+  ctx.fillStyle = '#2f5fb8'; ctx.fillRect(-19, -32, 38, 6);
+  if (back) {
+    limb(ctx, -16, -52, -6, -62, 9, '#ffd9b3', lw);
+    limb(ctx, 16, -52, 8, -64, 9, '#ffd9b3', lw);
+    rr(ctx, 1, -90, 8, 32, 3); blob(ctx, '#2a2d33', lw);
+    ctx.beginPath(); ctx.ellipse(0, -72, 21, 19, 0, 0, Math.PI * 2); blob(ctx, helmet, lw);
+    ctx.beginPath(); ctx.ellipse(0, -62, 23, 6, 0, 0, Math.PI); blob(ctx, helmet, lw);
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.beginPath(); ctx.ellipse(-7, -82, 7, 3.5, -0.4, 0, Math.PI * 2); ctx.fill();
+  } else {
+    // Front: facing the camera, holding a rifle across the chest
+    ctx.beginPath(); ctx.arc(0, -70, 18, 0, Math.PI * 2); blob(ctx, '#ffd9b3', lw);
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(-6, -69, 2.6, 0, Math.PI * 2); ctx.arc(6, -69, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -80, 22, 17, 0, Math.PI, 0); ctx.closePath(); blob(ctx, helmet, lw);
+    ctx.beginPath(); ctx.ellipse(0, -79, 24, 5, 0, 0, Math.PI * 2); blob(ctx, helmet, lw);
+    ctx.save(); ctx.rotate(-0.5);
+    rr(ctx, -4, -62, 36, 8, 3); blob(ctx, '#2a2d33', lw);
+    ctx.restore();
+    limb(ctx, -16, -52, -4, -44, 9, '#ffd9b3', lw);
+    limb(ctx, 16, -52, 10, -58, 9, '#ffd9b3', lw);
+  }
+  ctx.restore();
+}
+
+// Gatling gun reward (drawn on top of barrels).
+function drawGatling(ctx, cx, cy, s, t) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.25);
+  const lw = Math.max(1.5, s / 14);
+  rr(ctx, -s * 0.55, -s * 0.18, s * 0.5, s * 0.36, s * 0.08); blob(ctx, '#ffc933', lw);
+  for (let i = -1; i <= 1; i++) { rr(ctx, -s * 0.08, i * s * 0.1 - s * 0.045, s * 0.7, s * 0.09, s * 0.03); blob(ctx, '#3a3f4f', lw * 0.8); }
+  rr(ctx, s * 0.55, -s * 0.2, s * 0.1, s * 0.4, s * 0.03); blob(ctx, '#ffc933', lw);
+  rr(ctx, -s * 0.4, s * 0.12, s * 0.16, s * 0.3, s * 0.05); blob(ctx, '#7a4a28', lw);
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(-s * 0.5, -s * 0.14, s * 0.35, s * 0.06);
+  ctx.restore();
+}
+
+// Floating power-up orbs shown on top of barrels.
+function drawPickup(ctx, cx, cy, s, kind, t) {
+  ctx.save();
+  ctx.translate(cx, cy + Math.sin(t * 4) * s * 0.06);
+  const lw = Math.max(1.5, s / 12);
+  const col = { shield: '#3aa0ff', rage: '#ff6a2a', medkit: '#ffffff', grenade: '#4fb84a', coins: '#ffc933' }[kind] || '#fff';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.42, 0, Math.PI * 2); blob(ctx, col, lw);
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.beginPath(); ctx.ellipse(-s * 0.14, -s * 0.16, s * 0.12, s * 0.07, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = kind === 'medkit' ? '#ff4d5e' : '#fff';
+  ctx.strokeStyle = INK; ctx.lineWidth = lw * 0.7;
+  if (kind === 'medkit') { ctx.fillRect(-s * 0.08, -s * 0.24, s * 0.16, s * 0.48); ctx.fillRect(-s * 0.24, -s * 0.08, s * 0.48, s * 0.16); }
+  else if (kind === 'shield') { ctx.beginPath(); ctx.moveTo(0, -s * 0.25); ctx.lineTo(s * 0.2, -s * 0.15); ctx.lineTo(s * 0.16, s * 0.1); ctx.lineTo(0, s * 0.26); ctx.lineTo(-s * 0.16, s * 0.1); ctx.lineTo(-s * 0.2, -s * 0.15); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  else if (kind === 'rage') { ctx.beginPath(); ctx.moveTo(s * 0.05, -s * 0.28); ctx.lineTo(-s * 0.14, s * 0.04); ctx.lineTo(0, s * 0.04); ctx.lineTo(-s * 0.05, s * 0.28); ctx.lineTo(s * 0.15, -s * 0.05); ctx.lineTo(0, -s * 0.05); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  else if (kind === 'grenade') { ctx.beginPath(); ctx.arc(0, s * 0.03, s * 0.16, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillRect(-s * 0.04, -s * 0.24, s * 0.08, s * 0.1); }
+  else if (kind === 'coins') { ctx.font = `900 ${Math.round(s * 0.45)}px "Lilita One", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.strokeText('$', 0, s * 0.02); ctx.fillText('$', 0, s * 0.02); }
+  ctx.restore();
+}
+
 function drawRock(ctx, cx, cy, r, t) {
   ctx.save();
   ctx.translate(cx, cy);
@@ -496,6 +591,8 @@ const ICONS = {
   arrow: c => `<path d="M22 8l24 24-24 24" fill="none" stroke="${INK}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 8l24 24-24 24" fill="none" stroke="${c}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`,
   music: c => `<path d="M24 46V14l30-6v32" fill="none" stroke="${INK}" stroke-width="5" stroke-linejoin="round"/><ellipse cx="17" cy="47" rx="9" ry="7" fill="${c}" stroke="${INK}" stroke-width="4"/><ellipse cx="47" cy="41" rx="9" ry="7" fill="${c}" stroke="${INK}" stroke-width="4"/><path d="M24 22l30-6" stroke="${INK}" stroke-width="5"/>`,
   sound: c => `<path d="M8 24h12l14-12v40L20 40H8z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><path d="M42 22c4 5 4 15 0 20M49 15c8 9 8 25 0 34" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`,
+  mute: () => `<path d="M8 24h12l14-12v40L20 40H8z" fill="#fff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><path d="M42 24l14 16M56 24 42 40" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`,
+  back: () => `<path d="M28 10 8 30l20 20V38c12 0 20 4 26 14 0-16-8-28-26-28z" fill="#fff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>`,
   pause: () => `<rect x="14" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/><rect x="38" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/>`,
 };
 
