@@ -182,7 +182,7 @@ function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0) {
 // ---------- Zombies ----------
 
 function drawZombie(ctx, cx, footY, height, t, opts) {
-  const { color = '#7cbf5a', flash = 0, wide = 1, boss = false, final = false, shirt = '#6b6f9a' } = opts || {};
+  const { color = '#7cbf5a', flash = 0, wide = 1, boss = false, final = false, shirt = '#6b6f9a', helmet = false, bomb = false } = opts || {};
   const u = height / 100;
   const skin = flash > 0 ? '#ffffff' : color;
   const sway = Math.sin(t * 6) * 3;
@@ -242,6 +242,24 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
   ctx.beginPath(); ctx.ellipse(0, -65, 8, 5, 0, 0, Math.PI * 2); blob(ctx, '#5a1a22', 2);
   ctx.fillStyle = '#fff';
   ctx.fillRect(-5, -70, 3, 3); ctx.fillRect(2, -70, 3, 3);
+
+  if (helmet) {
+    // Dented army helmet
+    ctx.beginPath(); ctx.ellipse(0, -88, 27, 21, 0, Math.PI, 0); ctx.closePath(); blob(ctx, flash > 0 ? '#fff' : '#7d8699', lw);
+    ctx.beginPath(); ctx.ellipse(0, -88, 30, 5, 0, 0, Math.PI * 2); blob(ctx, flash > 0 ? '#fff' : '#646c80', lw);
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.beginPath(); ctx.ellipse(-9, -100, 6, 3, -0.4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  if (bomb) {
+    // Strapped-on bomb with a lit fuse
+    ctx.beginPath(); ctx.arc(0, -42, 11, 0, Math.PI * 2); blob(ctx, '#2b2342', lw);
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(-4, -46, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(4, -52); ctx.quadraticCurveTo(10, -60, 6, -64); ctx.stroke();
+    ctx.fillStyle = Math.sin(t * 30) > 0 ? '#ffe14d' : '#ff7a1a';
+    ctx.beginPath(); ctx.arc(6, -65, 4, 0, Math.PI * 2); ctx.fill();
+  }
 
   if (final) {
     // Officer cap for the chapter boss
@@ -387,6 +405,49 @@ function drawBush(ctx, cx, footY, h) {
   ctx.beginPath(); ctx.arc(-h * 0.1, -h * 0.72, h * 0.12, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#ff5fb4';
   for (const [x, y] of [[-0.4, -0.35], [0.25, -0.6], [0.45, -0.25]]) { ctx.beginPath(); ctx.arc(h * x, h * y, h * 0.06, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawCactus(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 18);
+  const w = h * 0.22;
+  rr(ctx, -h * 0.42, -h * 0.72, w * 0.8, h * 0.34, w * 0.4); blob(ctx, '#3fae5a', lw);
+  rr(ctx, -h * 0.42, -h * 0.46, h * 0.3, w * 0.7, w * 0.35); blob(ctx, '#3fae5a', lw);
+  rr(ctx, h * 0.24, -h * 0.62, w * 0.8, h * 0.3, w * 0.4); blob(ctx, '#3fae5a', lw);
+  rr(ctx, h * 0.1, -h * 0.4, h * 0.3, w * 0.7, w * 0.35); blob(ctx, '#3fae5a', lw);
+  rr(ctx, -w / 2, -h, w, h, w / 2); blob(ctx, '#46c263', lw);
+  ctx.strokeStyle = 'rgba(20,70,40,.45)'; ctx.lineWidth = Math.max(1, h / 40);
+  ctx.beginPath(); ctx.moveTo(0, -h * 0.92); ctx.lineTo(0, -h * 0.08); ctx.stroke();
+  ctx.fillStyle = '#ff5fb4';
+  ctx.beginPath(); ctx.arc(0, -h, w * 0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawDesertRock(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 16);
+  ctx.beginPath();
+  ctx.moveTo(-h * 0.7, 0); ctx.lineTo(-h * 0.55, -h * 0.6); ctx.lineTo(-h * 0.1, -h); ctx.lineTo(h * 0.4, -h * 0.75); ctx.lineTo(h * 0.7, 0);
+  ctx.closePath(); blob(ctx, '#b86a45', lw);
+  ctx.fillStyle = '#d98a5a';
+  ctx.beginPath(); ctx.moveTo(-h * 0.5, -h * 0.55); ctx.lineTo(-h * 0.1, -h * 0.92); ctx.lineTo(0, -h * 0.5); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawDrum(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 16);
+  const w = h * 0.7;
+  rr(ctx, -w / 2, -h, w, h, w * 0.1); blob(ctx, '#2f7fe0', lw);
+  ctx.fillStyle = '#1c55a8';
+  ctx.fillRect(-w / 2, -h * 0.68, w, h * 0.08); ctx.fillRect(-w / 2, -h * 0.34, w, h * 0.08);
+  ctx.beginPath(); ctx.ellipse(0, -h, w / 2, w * 0.14, 0, 0, Math.PI * 2); blob(ctx, '#5aa8ff', lw);
+  ctx.fillStyle = '#ffd23a';
+  ctx.beginPath(); ctx.moveTo(0, -h * 0.62); ctx.lineTo(w * 0.18, -h * 0.4); ctx.lineTo(-w * 0.18, -h * 0.4); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 

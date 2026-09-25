@@ -16,7 +16,11 @@ function defaultSave() {
     equipped: { helmet: 2, rifle: 1, gloves: null, scope: null },
     nextId: 3,
     settings: { music: 0.5, sfx: 0.8 },
-    progress: { ch1: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] } },
+    progress: {
+      ch1: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] },
+      ch2: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] },
+    },
+    chests: [],
   };
 }
 
@@ -25,7 +29,15 @@ let save = loadSave();
 function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) return Object.assign(defaultSave(), JSON.parse(raw));
+    if (raw) {
+      const def = defaultSave();
+      const data = Object.assign(def, JSON.parse(raw));
+      // Older saves: add any chapters and fields they are missing.
+      data.progress = Object.assign(defaultSave().progress, data.progress);
+      data.settings = Object.assign(defaultSave().settings, data.settings);
+      data.chests = data.chests || [];
+      return data;
+    }
   } catch { /* storage unavailable or corrupt: start fresh */ }
   return defaultSave();
 }
@@ -123,6 +135,10 @@ function playerStats() {
 
 function totalScore() {
   return Object.values(save.progress).reduce((sum, ch) => sum + ch.best.reduce((a, b) => a + b, 0), 0);
+}
+
+function chapterUnlocked(ch) {
+  return ch === 0 || save.progress[CHAPTERS[ch - 1].id].stars[5] > 0;
 }
 
 function totalStars() {

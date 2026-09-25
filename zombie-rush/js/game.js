@@ -87,12 +87,12 @@ const Game = (() => {
 
   // ---------- Run lifecycle ----------
 
-  function start(lvlIdx, endCallback) {
-    const cfg = CHAPTERS[0].levels[lvlIdx];
+  function start(chIdx, lvlIdx, endCallback) {
+    const cfg = CHAPTERS[chIdx].levels[lvlIdx];
     const stats = playerStats();
     onEnd = endCallback;
     run = {
-      lvlIdx, cfg, stats,
+      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, theme: CHAPTERS[chIdx].theme,
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
@@ -104,7 +104,7 @@ const Game = (() => {
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
     };
-    hud.level.textContent = `${lvlIdx + 1}. ${cfg.name}`;
+    hud.level.textContent = `${chIdx + 1}-${lvlIdx + 1} · ${cfg.name}`;
     hud.boss.hidden = true;
     for (let z = 0; z < Z_FAR; z += 5) spawnProp(z);
     showBanner('ZOMBIES INCOMING', 2);
@@ -129,14 +129,14 @@ const Game = (() => {
     const r = run;
     const hpPct = Math.max(0, r.hp) / r.maxHp;
     const stars = win ? (hpPct > 0.7 ? 3 : hpPct > 0.35 ? 2 : 1) : 0;
-    const coins = r.coins + r.kills * 3 + (win ? 150 + r.lvlIdx * 100 : 0);
-    const score = r.kills * 10 + (win ? 1000 * (r.lvlIdx + 1) + Math.round(hpPct * 1000) : 0);
+    const coins = r.coins + r.kills * 3 + (win ? 150 + r.gl * 100 : 0);
+    const score = r.kills * 10 + (win ? 1000 * (r.gl + 1) + Math.round(hpPct * 1000) : 0);
     cancelAnimationFrame(raf);
     Sound.setMode('menu');
     Sound.play(win ? 'victory' : 'defeat');
     const cb = onEnd;
     run = null;
-    cb({ win, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, reached: r.dist / r.cfg.length });
+    cb({ win, chIdx: r.chIdx, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, reached: r.dist / r.cfg.length });
   }
 
   function showBanner(text, dur, kind = '') {
@@ -153,20 +153,20 @@ const Game = (() => {
 
   function spawnProp(z) {
     const side = Math.random() < 0.5 ? -1 : 1;
-    const kind = pick(['cone', 'crate', 'tires', 'hydrant', 'bush', 'bush', 'car']);
-    const far = kind === 'car' || kind === 'bush';
+    const kind = pick(run.theme.props);
+    const far = kind === 'car' || kind === 'bush' || kind === 'cactus' || kind === 'rock';
     run.props.push({
       x: side * (far ? rand(2.05, 2.6) : rand(1.3, 1.8)), z, kind,
-      h: kind === 'car' ? rand(0.32, 0.4) : kind === 'bush' ? rand(0.3, 0.45) : rand(0.22, 0.32),
+      h: kind === 'car' ? rand(0.32, 0.4) : kind === 'bush' || kind === 'rock' ? rand(0.3, 0.45) : kind === 'cactus' ? rand(0.45, 0.65) : rand(0.22, 0.32),
       color: pick(['#ff4d5e', '#29a8ff', '#ffc933', '#a55cff', '#4fd645', '#ff8a1f']),
     });
   }
 
+  const TYPE_WEIGHT = { walker: 5, runner: 2.2, tank: 1, armored: 2, bomber: 1.3 };
   function zombieType() {
     const types = run.cfg.types;
-    const r = Math.random();
-    if (types.includes('tank') && r < 0.12) return 'tank';
-    if (types.includes('runner') && r < 0.35) return 'runner';
+    let r = Math.random() * types.reduce((sum, t) => sum + TYPE_WEIGHT[t], 0);
+    for (const t of types) if ((r -= TYPE_WEIGHT[t]) < 0) return t;
     return 'walker';
   }
 
@@ -175,7 +175,7 @@ const Game = (() => {
     const hp = Math.round(run.cfg.zhp * zt.hpMult);
     run.zombies.push({
       type, x, z, hp, maxHp: hp, speed: zt.speed * rand(0.85, 1.15), size: zt.size,
-      color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10,
+      color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
     });
   }
@@ -190,7 +190,7 @@ const Game = (() => {
   }
 
   function spawnBarrel(z) {
-    const hp = Math.round((25 + run.lvlIdx * 22) * rand(0.8, 1.8));
+    const hp = Math.round((25 + run.gl * 30) * rand(0.8, 1.8));
     run.barrels.push({
       x: rand(-0.65, 0.65), z, hp, maxHp: hp,
       drop: pick(['shield', 'rage', 'medkit', 'grenade', 'coins', 'rage', 'medkit']),
@@ -411,12 +411,12 @@ const Game = (() => {
   function applyDrop(drop, at) {
     const r = run;
     const p = proj(at.x, at.z);
-    const say = (t, c) => addText(p.x, p.y - 40, t, c, 22, 1.2);
+    const say = (t, c) => addText(W / 2, H * 0.42, t, c, 26, 1.2);
     Sound.play(drop === 'coins' ? 'coin' : 'powerup');
     if (drop === 'shield') { r.shield = 6; say('SHIELD!', '#6fd3ff'); }
     else if (drop === 'rage') { r.rage = 6; say('RAGE x2!', '#ff6a3a'); }
     else if (drop === 'medkit') { r.hp = Math.min(r.maxHp, r.hp + r.maxHp * 0.25); say('+25% HP', '#5dff8a'); }
-    else if (drop === 'coins') { const c = 25 + r.lvlIdx * 15; r.coins += c; say(`+${c} COINS`, '#ffd23a'); }
+    else if (drop === 'coins') { const c = 25 + r.gl * 15; r.coins += c; say(`+${c} COINS`, '#ffd23a'); }
     else if (drop === 'grenade') {
       say('GRENADE!', '#ffd23a');
       const dmg = r.stats.dmg * r.dmgMult * 8;
@@ -449,8 +449,9 @@ const Game = (() => {
       z.z -= move + z.speed * dt;
       if (z.z < 14) z.x += clamp(r.x - z.x, -1, 1) * 0.6 * dt;
       if (z.z < 0.45 && z.z > -0.5 && Math.abs(z.x - r.x) < 0.25 + 0.1 * z.size) {
-        hurtPlayer(r.cfg.zdmg * (z.type === 'tank' ? 2 : 1));
+        hurtPlayer(r.cfg.zdmg * z.contact);
         burst(z.x, z.z, z.color, 8);
+        if (z.bomb) { burst(z.x, z.z, '#ffb02e', 20); Sound.play('explode'); r.shake = 0.35; }
         r.zombies.splice(i, 1);
       } else if (z.z < -1.5) {
         r.zombies.splice(i, 1);
@@ -507,17 +508,17 @@ const Game = (() => {
 
     r.bossThrow -= dt;
     if (r.bossThrow <= 0 && b.z <= 12) {
-      const count = b.final ? 3 : r.lvlIdx >= 3 ? 2 : 1;
+      const count = b.final ? 3 : r.gl >= 3 ? 2 : 1;
       for (let i = 0; i < count; i++) {
         const tx = clamp(r.x + (i ? rand(-0.5, 0.5) : 0), -0.85, 0.85);
         r.rocks.push({ x0: b.x, z0: b.z, tx, t: 0, dur: 1.05 });
         Sound.play('throw');
       }
-      r.bossThrow = b.final ? 1.1 : Math.max(1.3, 2 - r.lvlIdx * 0.12);
+      r.bossThrow = b.final ? 1.1 : Math.max(1.2, 2 - r.gl * 0.1);
     }
     r.bossSummon -= dt;
     if (r.bossSummon <= 0) {
-      const n = 4 + r.lvlIdx * 2;
+      const n = 4 + Math.min(r.gl, 8) * 2;
       for (let i = 0; i < n; i++) spawnZombie(rand(-0.8, 0.8), b.z + rand(-1, 2), zombieType());
       r.bossSummon = 4.5;
     }
@@ -580,16 +581,17 @@ const Game = (() => {
     const far = proj(0, Z_FAR).y;
 
     // Park grass with scrolling mow stripes
-    ctx.fillStyle = '#48b83e';
+    const th = r.theme;
+    ctx.fillStyle = th.ground[0];
     ctx.fillRect(0, far, W, H - far);
     const gOff = r.dist % 4;
     for (let z = -gOff - 4; z < Z_FAR; z += 4) {
-      quad(-12, Math.max(z, zNear), 12, Math.max(z + 2, zNear), '#56c94a');
+      quad(-12, Math.max(z, zNear), 12, Math.max(z + 2, zNear), th.ground[1]);
     }
 
     // Sidewalks with tiles
     for (const s of [-1, 1]) {
-      quad(s * 1.08, zNear, s * 1.95, Z_FAR, '#98a4ef');
+      quad(s * 1.08, zNear, s * 1.95, Z_FAR, th.shoulder);
       ctx.strokeStyle = 'rgba(255,255,255,.35)';
       ctx.lineWidth = 1.5;
       const tOff = r.dist % 1;
@@ -606,7 +608,7 @@ const Game = (() => {
     }
 
     // Road
-    quad(-ROAD, zNear, ROAD, Z_FAR, '#4a4d86');
+    quad(-ROAD, zNear, ROAD, Z_FAR, th.road);
     quad(-ROAD, zNear, -ROAD + 0.12, Z_FAR, 'rgba(0,0,0,.12)');
     quad(ROAD - 0.12, zNear, ROAD, Z_FAR, 'rgba(0,0,0,.12)');
 
@@ -615,8 +617,8 @@ const Game = (() => {
     for (const s of [-1, 1]) {
       for (let z = -cOff - 1.2; z < Z_FAR; z += 1.2) {
         const z1 = Math.max(z, zNear), z2 = Math.max(z + 0.6, zNear), z3 = Math.max(z + 1.2, zNear);
-        quad(s * ROAD, z1, s * 1.08, z2, '#ff4d5e');
-        quad(s * ROAD, z2, s * 1.08, z3, '#ffffff');
+        quad(s * ROAD, z1, s * 1.08, z2, th.curb[0]);
+        quad(s * ROAD, z2, s * 1.08, z3, th.curb[1]);
       }
       const a = proj(s * ROAD, zNear), b = proj(s * ROAD, Z_FAR);
       ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
@@ -626,7 +628,7 @@ const Game = (() => {
     // Dashed yellow center line
     const dash = 3, off2 = r.dist % dash;
     for (let z = -off2 - CAM_D + 1; z < Z_FAR; z += dash) {
-      quad(-0.035, Math.max(z, zNear), 0.035, Math.max(z + 1.4, zNear), '#ffd35a');
+      quad(-0.035, Math.max(z, zNear), 0.035, Math.max(z + 1.4, zNear), th.line);
     }
 
     // Cracks and paint splats for texture
@@ -642,12 +644,12 @@ const Game = (() => {
 
     // Sunset sky at the far end
     const sky = ctx.createLinearGradient(0, 0, 0, far + 2);
-    sky.addColorStop(0, '#5a3fd6'); sky.addColorStop(0.6, '#ff6fae'); sky.addColorStop(1, '#ffc46b');
+    sky.addColorStop(0, th.sky[0]); sky.addColorStop(0.6, th.sky[1]); sky.addColorStop(1, th.sky[2]);
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, far + 2);
     const haze = ctx.createLinearGradient(0, far, 0, far + H * 0.12);
-    haze.addColorStop(0, 'rgba(255,196,107,.85)');
-    haze.addColorStop(1, 'rgba(255,196,107,0)');
+    haze.addColorStop(0, th.sky[2] + 'd9');
+    haze.addColorStop(1, th.sky[2] + '00');
     ctx.fillStyle = haze;
     ctx.fillRect(0, far, W, H * 0.12);
   }
@@ -673,7 +675,7 @@ const Game = (() => {
     const list = [];
     for (const p of r.props) list.push({ z: p.z, fn: () => drawProp(p) });
     for (const b of r.barrels) list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawBarrel(ctx, p.x, p.y, 0.42 * roadW * p.s, 0.5 * roadW * p.s, Math.max(0, Math.ceil(b.hp))); } });
-    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.5 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt }); } });
+    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.5 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb }); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
@@ -757,6 +759,9 @@ const Game = (() => {
     else if (p.kind === 'hydrant') drawHydrant(ctx, q.x, q.y, h);
     else if (p.kind === 'bush') drawBush(ctx, q.x, q.y, h);
     else if (p.kind === 'car') drawCar(ctx, q.x, q.y, h, p.color);
+    else if (p.kind === 'cactus') drawCactus(ctx, q.x, q.y, h);
+    else if (p.kind === 'rock') drawDesertRock(ctx, q.x, q.y, h);
+    else if (p.kind === 'drum') drawDrum(ctx, q.x, q.y, h);
     else drawTires(ctx, q.x, q.y, h);
   }
 

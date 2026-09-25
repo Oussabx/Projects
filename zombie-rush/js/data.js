@@ -56,6 +56,13 @@ const CHAPTERS = [
   {
     id: 'ch1',
     name: 'Dead City',
+    theme: {
+      sky: ['#5a3fd6', '#ff6fae', '#ffc46b'], sun: 'rgba(255,240,180,.9)',
+      ground: ['#48b83e', '#56c94a'], shoulder: '#98a4ef', road: '#4a4d86',
+      curb: ['#ff4d5e', '#ffffff'], line: '#ffd35a',
+      skyline: ['#3b2a8f', '#4a35a8'], windows: '#ffd35a', menuGround: ['#7b86d6', '#5561b8'],
+      props: ['cone', 'crate', 'tires', 'hydrant', 'bush', 'bush', 'car'],
+    },
     levels: [
       { name: 'Gas Station',  length: 200, zhp: 26, zdmg: 15, density: 1.0, power: 400, types: ['walker'],
         boss: { name: 'Brute',            hp: 1500,  dmg: 20, color: '#7dbb4a', size: 1.5 } },
@@ -71,12 +78,40 @@ const CHAPTERS = [
         boss: { name: 'Mayor Rot',        hp: 15000, dmg: 44, color: '#79b04a', size: 2.0, final: true } },
     ],
   },
+  {
+    id: 'ch2',
+    name: 'Scorched Highway',
+    theme: {
+      sky: ['#b5367a', '#ff7a3a', '#ffd27a'], sun: 'rgba(255,250,210,.95)',
+      ground: ['#f0b35a', '#f7c472'], shoulder: '#d9925a', road: '#6a4f63',
+      curb: ['#ffd23a', '#2b2342'], line: '#ffffff',
+      skyline: ['#b8502f', '#d0673a'], windows: null, menuGround: ['#e8a55a', '#c9803f'],
+      mesas: true,
+      props: ['cactus', 'cactus', 'rock', 'tires', 'drum', 'car', 'cone'],
+    },
+    levels: [
+      { name: 'Dusty Outskirts', length: 260, zhp: 82,  zdmg: 34, density: 1.5,  power: 5000,  types: ['walker', 'runner', 'armored'],
+        boss: { name: 'Sand Brute',   hp: 16000, dmg: 48, color: '#d4a84a', size: 1.6 } },
+      { name: 'Cactus Canyon',   length: 270, zhp: 88,  zdmg: 36, density: 1.53, power: 6000,  types: ['walker', 'runner', 'armored', 'bomber'],
+        boss: { name: 'Cactus Jack',  hp: 18000, dmg: 52, color: '#5fbf6a', size: 1.65 } },
+      { name: 'Rusty Junkyard',  length: 280, zhp: 95, zdmg: 38, density: 1.56,  power: 7000,  types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Scrap King',   hp: 21000, dmg: 56, color: '#c77d45', size: 1.7 } },
+      { name: 'Oil Refinery',    length: 290, zhp: 103, zdmg: 40, density: 1.59, power: 8200,  types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Oil Slick',    hp: 24000, dmg: 60, color: '#6f6a9a', size: 1.75 } },
+      { name: 'Sandstorm Pass',  length: 300, zhp: 112, zdmg: 42, density: 1.62,  power: 9600,  types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Dune Stalker', hp: 27000, dmg: 64, color: '#e08a4a', size: 1.8 } },
+      { name: 'Warlord Fort',    length: 320, zhp: 122, zdmg: 45, density: 1.65, power: 11200, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'The Warlord',  hp: 34000, dmg: 70, color: '#9a5fd6', size: 2.1, final: true } },
+    ],
+  },
 ];
 
 const ZOMBIE_TYPES = {
   walker: { hpMult: 1,   speed: 1.6, size: 1,    color: '#f28a3c', score: 10 },
   runner: { hpMult: 0.6, speed: 4.0, size: 0.85, color: '#e8563a', score: 12 },
   tank:   { hpMult: 3,   speed: 1.1, size: 1.35, color: '#8cbf4a', score: 30 },
+  armored: { hpMult: 2.2, speed: 1.3, size: 1.1, color: '#e0a04a', score: 20, helmet: true },
+  bomber:  { hpMult: 0.5, speed: 4.6, size: 0.8, color: '#ff5a4a', score: 15, bomb: true, contact: 2.5 },
 };
 
 const BOT_NAMES = [

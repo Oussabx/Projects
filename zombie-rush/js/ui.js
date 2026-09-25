@@ -6,6 +6,7 @@ const UI = (() => {
   const STAT_ICON = { hp: ['heart', '#ff4d5e'], dmg: ['burst', '#ff8a1f'], rate: ['fire', '#ff6a2a'], crit: ['target', '#2fe0c4'] };
   let tab = 2;
   let selectedLevel = 0;
+  let selectedChapter = 0;
   let gearFilter = 'all';
   let shopTab = 'chests';
   let sceneRaf = 0;
@@ -43,7 +44,7 @@ const UI = (() => {
   function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
   function slotDef(id) { return SLOTS.find(s => s.id === id); }
-  function progress() { return save.progress.ch1; }
+  function progress(ch = selectedChapter) { return save.progress[CHAPTERS[ch].id]; }
 
   function tile(item, opts = {}) {
     const rar = RARITIES[item.rarity];
@@ -77,7 +78,7 @@ const UI = (() => {
       const cur = getItem(save.equipped[s.id]);
       return save.inventory.some(i => i.slot === s.id && (!cur || itemStat(i) > itemStat(cur)));
     });
-    const dots = { 0: canChest, 1: upgrade, 3: canSkill };
+    const dots = { 0: canChest, 1: upgrade, 2: save.chests.length > 0 && tab !== 2, 3: canSkill };
     document.querySelectorAll('.navbar .tab').forEach(b => {
       b.querySelector('.tab-dot')?.remove();
       if (dots[b.dataset.tab]) b.insertAdjacentHTML('beforeend', '<span class="tab-dot"></span>');
@@ -103,7 +104,7 @@ const UI = (() => {
 
   function renderPlay() {
     const pr = progress();
-    const ch = CHAPTERS[0];
+    const ch = CHAPTERS[selectedChapter];
     selectedLevel = Math.min(selectedLevel, pr.unlocked - 1);
     const lvl = ch.levels[selectedLevel];
     const power = playerStats().power;
@@ -121,12 +122,16 @@ const UI = (() => {
     }).join('');
     const fill = Math.min(pr.unlocked - 1, 5) / 5 * 80;
     const weak = power < lvl.power;
+    const hasPrev = selectedChapter > 0, hasNext = selectedChapter < CHAPTERS.length - 1;
+    const nextOpen = hasNext && chapterUnlocked(selectedChapter + 1);
+    const queued = save.chests.length;
+    const nextChest = queued ? CHESTS.find(c => c.id === save.chests[0]) : null;
 
     $('#screen-play').innerHTML = `
       <div class="chapter-bar">
-        <button class="chapter-arrow left" disabled aria-label="Previous chapter">${icon('arrow', '#ffc933')}</button>
-        <div class="chapter-title"><small class="tx">CHAPTER 1</small><span class="tx">${ch.name}</span></div>
-        <button class="chapter-arrow" id="next-ch" aria-label="Next chapter">${icon('arrow', '#ffc933')}</button>
+        <button class="chapter-arrow left" id="prev-ch" ${hasPrev ? '' : 'disabled'} aria-label="Previous chapter">${icon('arrow', '#ffc933')}</button>
+        <div class="chapter-title"><small class="tx">CHAPTER ${selectedChapter + 1}</small><span class="tx">${ch.name}</span></div>
+        <button class="chapter-arrow ${nextOpen ? '' : 'locked'}" id="next-ch" ${hasNext ? '' : 'disabled'} aria-label="Next chapter">${nextOpen || !hasNext ? icon('arrow', '#ffc933') : icon('lock')}</button>
       </div>
       <div class="scene">
         <canvas id="scene-canvas"></canvas>
@@ -134,14 +139,15 @@ const UI = (() => {
           <span class="badge tx">${icon('bolt', '#ffc933')}${fmt(power)}</span>
           <span class="badge tx">${icon('star', '#ffc933')}${stars}/18</span>
         </div>
+        ${queued ? `<button class="chest-btn" id="chest-btn" aria-label="Open saved chest">${icon('chest', nextChest.color)}<span class="chest-count tx">${queued}</span><span class="chest-label tx">OPEN</span></button>` : ''}
       </div>
       <div class="panel"><div class="path"><div class="path-fill" style="width:${fill}%"></div>${nodes}</div></div>
       <div class="panel level-card">
         <div>
-          <div class="name tx">Level ${selectedLevel + 1} · ${lvl.name}</div>
+          <div class="name tx">Level ${selectedChapter + 1}-${selectedLevel + 1} · ${lvl.name}</div>
           <div class="level-meta">
             <span class="chip tx">${icon('skull', '#ff9aa4')}${lvl.boss.name}</span>
-            <span class="chip tx ${weak ? 'warn' : 'ok'}">${icon('bolt', '#ffc933')}Rec. ${lvl.power}</span>
+            <span class="chip tx ${weak ? 'warn' : 'ok'}">${icon('bolt', '#ffc933')}Rec. ${fmt(lvl.power)}</span>
             <span class="chip tx">${icon('ranks', '#ffc933')}Best ${fmt(pr.best[selectedLevel])}</span>
           </div>
         </div>
@@ -158,8 +164,23 @@ const UI = (() => {
       selectedLevel = i;
       render('play');
     }));
-    $('#next-ch').onclick = () => toast('Chapter 2 is coming soon');
-    $('#battle-btn').onclick = () => startLevel(selectedLevel);
+    $('#prev-ch').onclick = () => { selectedChapter--; selectedLevel = progress().unlocked - 1; render('play'); };
+    $('#next-ch').onclick = () => {
+      if (!nextOpen) { toast(`Beat ${ch.name} level 6 to unlock`); return; }
+      selectedChapter++; selectedLevel = progress().unlocked - 1; render('play');
+    };
+    const cb = $('#chest-btn');
+    if (cb) cb.onclick = openSavedChest;
+    $('#battle-btn').onclick = () => startLevel(selectedChapter, selectedLevel);
+  }
+
+  // Earned chests wait in storage until you open them.
+  function openSavedChest(after) {
+    const id = save.chests.shift();
+    const chest = CHESTS.find(c => c.id === id);
+    if (!chest) return;
+    persist();
+    chestOpening(chest, typeof after === 'function' ? after : null);
   }
 
   // Animated street scene behind the hero on the Play tab.
@@ -168,7 +189,8 @@ const UI = (() => {
     const cv = document.getElementById('scene-canvas');
     if (!cv) return;
     const c = cv.getContext('2d');
-    const lvl = CHAPTERS[0].levels[selectedLevel];
+    const lvl = CHAPTERS[selectedChapter].levels[selectedLevel];
+    const theme = CHAPTERS[selectedChapter].theme;
     const colors = ['#f28a3c', '#e8563a', '#ff9d4a', '#8cbf4a'];
     const walkers = Array.from({ length: 7 }, (_, i) => ({ x: (i / 6) * 1.6 - 0.8, z: 0.3 + ((i * 37) % 10) / 20, t: i * 1.3, color: colors[i % 4] }));
     const t0 = performance.now();
@@ -179,7 +201,7 @@ const UI = (() => {
       if (w && h) {
         if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        drawMenuScene(c, w, h, t, lvl, walkers);
+        drawMenuScene(c, w, h, t, lvl, walkers, theme);
       }
       sceneRaf = requestAnimationFrame(frame);
     };
@@ -187,50 +209,59 @@ const UI = (() => {
   }
   function stopScene() { cancelAnimationFrame(sceneRaf); }
 
-  function drawMenuScene(c, w, h, t, lvl, walkers) {
+  function drawMenuScene(c, w, h, t, lvl, walkers, th) {
     const hz = h * 0.46;
-    // Sunset sky
     const sky = c.createLinearGradient(0, 0, 0, hz);
-    sky.addColorStop(0, '#5a3fd6'); sky.addColorStop(0.55, '#ff6fae'); sky.addColorStop(1, '#ffc46b');
+    sky.addColorStop(0, th.sky[0]); sky.addColorStop(0.55, th.sky[1]); sky.addColorStop(1, th.sky[2]);
     c.fillStyle = sky; c.fillRect(0, 0, w, hz);
-    c.fillStyle = 'rgba(255,240,180,.9)';
+    c.fillStyle = th.sun;
     c.beginPath(); c.arc(w * 0.72, hz * 0.5, h * 0.09, 0, Math.PI * 2); c.fill();
-    // Skyline with lit windows
-    const bw = w / 9;
-    for (let i = 0; i < 10; i++) {
-      const bh = hz * (0.35 + ((i * 53) % 7) / 12);
-      const x = i * bw - bw * 0.3;
-      c.fillStyle = i % 2 ? '#3b2a8f' : '#4a35a8';
-      c.fillRect(x, hz - bh, bw * 0.92, bh);
-      c.fillStyle = '#ffd35a';
-      for (let wy = hz - bh + 8; wy < hz - 8; wy += 12) {
-        for (let wx = x + 6; wx < x + bw * 0.92 - 8; wx += 10) {
-          if (((wx * 7 + wy * 3 + i) | 0) % 5 === 0) c.fillRect(wx, wy, 4, 6);
+    if (th.mesas) {
+      // Desert mesas
+      const tops = [[0, 0.55], [0.18, 0.7], [0.42, 0.45], [0.62, 0.62], [0.85, 0.5]];
+      tops.forEach(([x, hh], i) => {
+        c.fillStyle = th.skyline[i % 2];
+        const mw = w * 0.26, top = hz - hz * hh * 0.6;
+        c.beginPath(); c.moveTo(w * x - mw * 0.1, hz); c.lineTo(w * x + mw * 0.08, top); c.lineTo(w * x + mw * 0.72, top); c.lineTo(w * x + mw * 0.9, hz); c.fill();
+        c.fillStyle = 'rgba(255,255,255,.12)';
+        c.fillRect(w * x + mw * 0.08, top, mw * 0.64, 4);
+      });
+    } else {
+      // Skyline with lit windows
+      const bw = w / 9;
+      for (let i = 0; i < 10; i++) {
+        const bh = hz * (0.35 + ((i * 53) % 7) / 12);
+        const x = i * bw - bw * 0.3;
+        c.fillStyle = th.skyline[i % 2];
+        c.fillRect(x, hz - bh, bw * 0.92, bh);
+        c.fillStyle = th.windows;
+        for (let wy = hz - bh + 8; wy < hz - 8; wy += 12) {
+          for (let wx = x + 6; wx < x + bw * 0.92 - 8; wx += 10) {
+            if (((wx * 7 + wy * 3 + i) | 0) % 5 === 0) c.fillRect(wx, wy, 4, 6);
+          }
         }
       }
     }
-    // Ground and road
     const g = c.createLinearGradient(0, hz, 0, h);
-    g.addColorStop(0, '#7b86d6'); g.addColorStop(1, '#5561b8');
+    g.addColorStop(0, th.menuGround[0]); g.addColorStop(1, th.menuGround[1]);
     c.fillStyle = g; c.fillRect(0, hz, w, h - hz);
-    c.fillStyle = '#4b4f8a';
+    c.fillStyle = th.road;
     c.beginPath(); c.moveTo(w * 0.36, hz); c.lineTo(w * 0.64, hz); c.lineTo(w * 1.05, h); c.lineTo(-w * 0.05, h); c.fill();
-    c.fillStyle = '#ffd35a';
+    c.fillStyle = th.line;
     for (let i = 0; i < 5; i++) {
       const f0 = (i + (t * 0.6) % 1) / 5, f1 = f0 + 0.08;
       const y0 = hz + (h - hz) * f0 * f0, y1 = hz + (h - hz) * f1 * f1;
       const w0 = 1 + f0 * 5, w1 = 1 + f1 * 5;
       c.beginPath(); c.moveTo(w / 2 - w0, y0); c.lineTo(w / 2 + w0, y0); c.lineTo(w / 2 + w1, y1); c.lineTo(w / 2 - w1, y1); c.fill();
     }
-    // Boss looming behind, then the horde
     drawZombie(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.2, shirt: '#4a3f7a' });
-    for (const z of walkers) {
+    const ch2 = !!th.mesas;
+    walkers.forEach((z, i) => {
       const y = hz + (h - hz) * z.z * 0.55;
-      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: '#6b4fb8' });
-    }
-    drawCone(c, w * 0.1, h * 0.93, h * 0.13);
-    drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, '');
-    // Hero
+      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: '#6b4fb8', helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
+    });
+    if (ch2) { drawCactus(c, w * 0.1, h * 0.95, h * 0.26); drawDrum(c, w * 0.9, h * 0.97, h * 0.15); }
+    else { drawCone(c, w * 0.1, h * 0.93, h * 0.13); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);
   }
 
@@ -493,7 +524,7 @@ const UI = (() => {
         <span class="avatar big"><canvas id="m-avatar" width="120" height="120"></canvas></span>
         <div>
           <div class="item-name tx">${save.name}</div>
-          <div class="profile-power tx">${icon('bolt', '#ffc933')}${fmt(playerStats().power)} · ${icon('star', '#ffc933')}${totalStars()}/18</div>
+          <div class="profile-power tx">${icon('bolt', '#ffc933')}${fmt(playerStats().power)} · ${icon('star', '#ffc933')}${totalStars()}/${CHAPTERS.length * 18}</div>
         </div>
       </div>
       <label class="set-row" for="set-music">${icon('music', '#ff5fb4')}<span class="tx">Music</span>
@@ -577,14 +608,16 @@ const UI = (() => {
 
   // ---------- Level flow ----------
 
-  function startLevel(i) {
+  function startLevel(ch, i) {
     stopScene();
     paused = false;
     closeModal();
+    selectedChapter = ch;
+    selectedLevel = i;
     $('#game-view').hidden = false;
     const hint = $('#hud-hint');
     hint.style.animation = 'none'; void hint.offsetWidth; hint.style.animation = '';
-    Game.start(i, onLevelEnd);
+    Game.start(ch, i, onLevelEnd);
   }
 
   function leaveGame(toTab = 2) {
@@ -611,15 +644,20 @@ const UI = (() => {
   }
 
   function onLevelEnd(res) {
-    const pr = progress();
+    const pr = progress(res.chIdx);
+    const chapter = CHAPTERS[res.chIdx];
     const firstClear = res.win && pr.stars[res.lvlIdx] === 0;
+    const final = res.win && chapter.levels[res.lvlIdx].boss.final;
+    const hasNextChapter = final && res.chIdx < CHAPTERS.length - 1;
     let gems = 0, chest = null;
     if (res.win) {
       pr.stars[res.lvlIdx] = Math.max(pr.stars[res.lvlIdx], res.stars);
       pr.unlocked = Math.max(pr.unlocked, Math.min(res.lvlIdx + 2, 6));
       if (firstClear) {
-        gems = 30 + res.lvlIdx * 10;
-        chest = CHAPTERS[0].levels[res.lvlIdx].boss.final ? CHESTS[2] : CHESTS[0];
+        gems = 30 + (res.chIdx * 6 + res.lvlIdx) * 10;
+        chest = final ? CHESTS[2] : res.chIdx > 0 ? CHESTS[1] : CHESTS[0];
+        // Chests are stored right away, so leaving the screen never loses them.
+        save.chests.push(chest.id);
       }
     }
     const prevBest = pr.best[res.lvlIdx];
@@ -629,7 +667,6 @@ const UI = (() => {
     persist();
     paused = true; // ignore pause toggles while the result is up
 
-    const final = res.win && CHAPTERS[0].levels[res.lvlIdx].boss.final;
     const newBest = res.score > prevBest;
     const rewards = `<div class="rewards">
       <div class="reward">${icon('coin')}<span class="tx">+${fmt(res.coins)}</span></div>
@@ -644,14 +681,18 @@ const UI = (() => {
 
     if (res.win) {
       const stars = [0, 1, 2].map(i => icon('star', i < res.stars ? '#ffc933' : '#2a2f6e')).join('');
+      const nextBtn = hasNextChapter ? `<button class="btn green" id="m-nextch"><span class="tx">Chapter ${res.chIdx + 2}!</span></button>`
+        : res.lvlIdx < 5 ? '<button class="btn green" id="m-next"><span class="tx">Next</span></button>'
+        : '<button class="btn green" id="m-retry"><span class="tx">Replay</span></button>';
       sheet(final ? 'Chapter clear!' : 'Victory!', `
         <div class="rays-wrap"><div class="rays"></div><div class="stars">${stars}</div></div>
         ${stats}${rewards}
+        ${chest ? '<p>Your chest is saved. Open it now or later from the Battle screen.</p>' : ''}
+        ${hasNextChapter ? `<p>${CHAPTERS[res.chIdx + 1].name} is now unlocked!</p>` : ''}
+        ${chest ? '<button class="btn blue wide" id="m-chest"><span class="tx">Open chest</span></button>' : ''}
         <div class="actions">
           <button class="btn grey" id="m-home"><span class="tx">Home</span></button>
-          ${chest ? '<button class="btn blue" id="m-chest"><span class="tx">Open chest</span></button>'
-                  : res.lvlIdx < 5 ? '<button class="btn green" id="m-next"><span class="tx">Next</span></button>'
-                  : '<button class="btn green" id="m-retry"><span class="tx">Replay</span></button>'}
+          ${nextBtn}
         </div>`);
     } else {
       const pct = Math.round(Math.min(1, res.reached) * 100);
@@ -676,17 +717,22 @@ const UI = (() => {
       $('#m-gear').onclick = () => leaveGame(1);
     }
 
-    $('#m-home').onclick = () => leaveGame();
-    const next = $('#m-next'), retry = $('#m-retry'), ch = $('#m-chest');
-    if (next) next.onclick = () => { selectedLevel = res.lvlIdx + 1; startLevel(selectedLevel); };
-    if (retry) retry.onclick = () => startLevel(res.lvlIdx);
-    if (ch) ch.onclick = () => {
-      // Earned chests open for free, then return to the menu.
+    if (res.win && res.lvlIdx < 5) selectedLevel = res.lvlIdx + 1;
+    if (hasNextChapter) { selectedChapter = res.chIdx + 1; selectedLevel = 0; }
+
+    $('#m-home').onclick = () => {
+      leaveGame();
+      if (save.chests.length) toast('Chest saved: tap it on the Battle screen');
+    };
+    const next = $('#m-next'), nextCh = $('#m-nextch'), retry = $('#m-retry'), open = $('#m-chest');
+    if (next) next.onclick = () => startLevel(res.chIdx, res.lvlIdx + 1);
+    if (nextCh) nextCh.onclick = () => startLevel(res.chIdx + 1, 0);
+    if (retry) retry.onclick = () => startLevel(res.chIdx, res.lvlIdx);
+    if (open) open.onclick = () => {
       Game.quit();
       $('#game-view').hidden = true;
-      chestOpening(chest, () => setTab(2));
+      openSavedChest(() => setTab(2));
     };
-    if (res.win && res.lvlIdx < 5) selectedLevel = res.lvlIdx + 1;
   }
 
   // ---------- Init ----------
@@ -716,6 +762,7 @@ const UI = (() => {
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal' && $('#m-close')) closeModal();
     });
+    for (let c = CHAPTERS.length - 1; c >= 0; c--) if (chapterUnlocked(c)) { selectedChapter = c; break; }
     selectedLevel = Math.max(0, progress().unlocked - 1);
     Game.init();
     setTab(2);
