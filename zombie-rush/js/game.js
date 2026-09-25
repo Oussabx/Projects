@@ -108,6 +108,7 @@ const Game = (() => {
     hud.boss.hidden = true;
     for (let z = 0; z < Z_FAR; z += 5) spawnProp(z);
     showBanner('ZOMBIES INCOMING', 2);
+    Sound.setMode('battle');
     resize();
     last = performance.now();
     cancelAnimationFrame(raf);
@@ -122,15 +123,17 @@ const Game = (() => {
       raf = requestAnimationFrame(loop);
     }
   }
-  function quit() { cancelAnimationFrame(raf); run = null; keys.clear(); }
+  function quit() { cancelAnimationFrame(raf); run = null; keys.clear(); Sound.setMode('menu'); }
 
   function finish(win) {
     const r = run;
     const hpPct = Math.max(0, r.hp) / r.maxHp;
     const stars = win ? (hpPct > 0.7 ? 3 : hpPct > 0.35 ? 2 : 1) : 0;
-    const coins = r.coins + r.kills * 2 + (win ? 100 + r.lvlIdx * 60 : 0);
+    const coins = r.coins + r.kills * 3 + (win ? 150 + r.lvlIdx * 100 : 0);
     const score = r.kills * 10 + (win ? 1000 * (r.lvlIdx + 1) + Math.round(hpPct * 1000) : 0);
     cancelAnimationFrame(raf);
+    Sound.setMode('menu');
+    Sound.play(win ? 'victory' : 'defeat');
     const cb = onEnd;
     run = null;
     cb({ win, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, reached: r.dist / r.cfg.length });
@@ -142,6 +145,7 @@ const Game = (() => {
     hud.banner.classList.toggle('boss', kind === 'boss');
     hud.banner.classList.toggle('good', kind === 'good');
     hud.banner.hidden = false;
+    if (kind !== 'good') Sound.play('warn');
     hud.banner.classList.remove('show'); void hud.banner.offsetWidth; hud.banner.classList.add('show');
   }
 
@@ -178,7 +182,7 @@ const Game = (() => {
 
   function spawnGroup(z) {
     const cfg = run.cfg;
-    const count = Math.round((4 + Math.random() * 5) * cfg.density + run.lvlIdx);
+    const count = Math.round((4 + Math.random() * 4) * cfg.density);
     const cx = rand(-0.5, 0.5);
     for (let i = 0; i < count; i++) {
       spawnZombie(clamp(cx + rand(-0.45, 0.45), -0.9, 0.9), z + rand(0, 3.5), zombieType());
@@ -210,7 +214,7 @@ const Game = (() => {
 
   function spawnGate(z) {
     const a = gateOption(true);
-    let b = gateOption(Math.random() < 0.45);
+    let b = gateOption(Math.random() < 0.3);
     if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     run.gates.push({ z, sides: [{ side: -1, ...sides[0] }, { side: 1, ...sides[1] }] });
@@ -229,8 +233,8 @@ const Game = (() => {
     run.boss = {
       ...b, x: 0, z: 24, hp: b.hp, maxHp: b.hp, flash: 0, t: 0,
     };
-    run.bossThrow = 2.5;
-    run.bossSummon = 4;
+    run.bossThrow = 2;
+    run.bossSummon = 3;
     hud.bossName.textContent = b.name;
     hud.boss.hidden = false;
     showBanner(b.final ? 'FINAL BOSS' : 'BOSS INCOMING', 2.2, 'boss');
@@ -317,6 +321,7 @@ const Game = (() => {
       r.bullets.push({ x: r.x + 0.08 + off, z: 0.9, vx: off * 0.25 });
     }
     r.flash = 0.06;
+    Sound.play('shoot');
   }
 
   function bulletDamage() {
@@ -363,6 +368,7 @@ const Game = (() => {
           hit = true;
           const { dmg, crit } = bulletDamage();
           target.hp -= dmg;
+          Sound.play('hit');
           target.flash = 0.08;
           const p = proj(target.x, target.z);
           const hgt = target === r.boss ? 0.8 * target.size : r.barrels.includes(target) ? 0.3 : 0.5 * (target.size || 1);
@@ -380,11 +386,13 @@ const Game = (() => {
     if (r.zombies.includes(t)) {
       r.zombies.splice(r.zombies.indexOf(t), 1);
       r.kills++;
+      Sound.play('kill');
       burst(t.x, t.z, t.color, 7);
       burst(t.x, t.z, pick(['#ffe14d', '#ff5fb4', '#2fe0c4', '#8fd2ff']), 4);
     } else if (r.barrels.includes(t)) {
       r.barrels.splice(r.barrels.indexOf(t), 1);
       burst(t.x, t.z, '#ff5a3a', 18);
+      Sound.play('explode');
       applyDrop(t.drop, t);
     } else if (t === r.boss) {
       burst(t.x, t.z, t.color, 60);
@@ -396,6 +404,7 @@ const Game = (() => {
       r.state = 'ending';
       r.endTimer = 1.4;
       showBanner('BOSS DEFEATED', 1.4, 'good');
+      Sound.play('explode');
     }
   }
 
@@ -403,6 +412,7 @@ const Game = (() => {
     const r = run;
     const p = proj(at.x, at.z);
     const say = (t, c) => addText(p.x, p.y - 40, t, c, 22, 1.2);
+    Sound.play(drop === 'coins' ? 'coin' : 'powerup');
     if (drop === 'shield') { r.shield = 6; say('SHIELD!', '#6fd3ff'); }
     else if (drop === 'rage') { r.rage = 6; say('RAGE x2!', '#ff6a3a'); }
     else if (drop === 'medkit') { r.hp = Math.min(r.maxHp, r.hp + r.maxHp * 0.25); say('+25% HP', '#5dff8a'); }
@@ -421,8 +431,9 @@ const Game = (() => {
 
   function hurtPlayer(dmg) {
     const r = run;
-    if (r.shield > 0) { addText(W / 2, baseY - roadW * 0.8, 'BLOCKED', '#6fd3ff', 16); return; }
+    if (r.shield > 0) { addText(W / 2, baseY - roadW * 0.8, 'BLOCKED', '#6fd3ff', 16); Sound.play('block'); return; }
     r.hp -= dmg;
+    Sound.play('hurt');
     r.hurt = 0.4;
     r.shake = 0.25;
     const p = proj(r.x, 0);
@@ -436,7 +447,7 @@ const Game = (() => {
       z.t += dt;
       z.flash = Math.max(0, z.flash - dt);
       z.z -= move + z.speed * dt;
-      if (z.z < 14) z.x += clamp(r.x - z.x, -1, 1) * 0.45 * dt;
+      if (z.z < 14) z.x += clamp(r.x - z.x, -1, 1) * 0.6 * dt;
       if (z.z < 0.45 && z.z > -0.5 && Math.abs(z.x - r.x) < 0.25 + 0.1 * z.size) {
         hurtPlayer(r.cfg.zdmg * (z.type === 'tank' ? 2 : 1));
         burst(z.x, z.z, z.color, 8);
@@ -479,6 +490,7 @@ const Game = (() => {
   function applyGate(g) {
     const r = run;
     const good = g.val >= 0;
+    Sound.play(good ? 'gateGood' : 'gateBad');
     if (g.type === 'dmg') r.dmgMult = Math.max(0.2, r.dmgMult * (1 + g.val / 100));
     else if (g.type === 'rate') r.rateMult = Math.max(0.2, r.rateMult * (1 + g.val / 100));
     else if (g.type === 'shot') r.shots = Math.min(MAX_SHOTS, r.shots + 1);
@@ -495,18 +507,19 @@ const Game = (() => {
 
     r.bossThrow -= dt;
     if (r.bossThrow <= 0 && b.z <= 12) {
-      const count = b.final ? 2 : 1;
+      const count = b.final ? 3 : r.lvlIdx >= 3 ? 2 : 1;
       for (let i = 0; i < count; i++) {
         const tx = clamp(r.x + (i ? rand(-0.5, 0.5) : 0), -0.85, 0.85);
-        r.rocks.push({ x0: b.x, z0: b.z, tx, t: 0, dur: 1.15 });
+        r.rocks.push({ x0: b.x, z0: b.z, tx, t: 0, dur: 1.05 });
+        Sound.play('throw');
       }
-      r.bossThrow = b.final ? 1.7 : 2.3;
+      r.bossThrow = b.final ? 1.1 : Math.max(1.3, 2 - r.lvlIdx * 0.12);
     }
     r.bossSummon -= dt;
     if (r.bossSummon <= 0) {
-      const n = 3 + r.lvlIdx;
+      const n = 4 + r.lvlIdx * 2;
       for (let i = 0; i < n; i++) spawnZombie(rand(-0.8, 0.8), b.z + rand(-1, 2), zombieType());
-      r.bossSummon = 5.5;
+      r.bossSummon = 4.5;
     }
   }
 
@@ -518,6 +531,7 @@ const Game = (() => {
       if (k.t >= k.dur) {
         if (Math.abs(k.tx - r.x) < 0.3) hurtPlayer(r.boss ? r.boss.dmg : 15);
         burst(k.tx, 0, '#8fd13b', 12);
+        Sound.play('thud');
         r.rocks.splice(i, 1);
       }
     }

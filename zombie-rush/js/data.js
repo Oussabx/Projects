@@ -57,26 +57,26 @@ const CHAPTERS = [
     id: 'ch1',
     name: 'Dead City',
     levels: [
-      { name: 'Gas Station',  length: 180, zhp: 12, zdmg: 10, density: 0.9, power: 300, types: ['walker'],
-        boss: { name: 'Brute',            hp: 700,  dmg: 14, color: '#7dbb4a', size: 1.5 } },
-      { name: 'Main Street',      length: 200, zhp: 17, zdmg: 11, density: 1.0, power: 420, types: ['walker', 'runner'],
-        boss: { name: 'Chomper',          hp: 1100, dmg: 16, color: '#8cc63f', size: 1.55 } },
-      { name: 'Broken Bridge',  length: 220, zhp: 23, zdmg: 12, density: 1.1, power: 560, types: ['walker', 'runner'],
-        boss: { name: 'Big Mouth',        hp: 1600, dmg: 18, color: '#6aa84f', size: 1.6 } },
-      { name: 'Subway Tunnel',     length: 240, zhp: 30, zdmg: 14, density: 1.15, power: 740, types: ['walker', 'runner', 'tank'],
-        boss: { name: 'Sewer Hulk',       hp: 2300, dmg: 20, color: '#5e9e6e', size: 1.7 } },
-      { name: 'Toxic Factory',   length: 260, zhp: 38, zdmg: 16, density: 1.2, power: 950, types: ['walker', 'runner', 'tank'],
-        boss: { name: 'Toxic Butcher',    hp: 3200, dmg: 23, color: '#a3d13b', size: 1.75 } },
-      { name: 'City Hall', length: 280, zhp: 48, zdmg: 18, density: 1.3, power: 1200, types: ['walker', 'runner', 'tank'],
-        boss: { name: 'Mayor Rot',        hp: 5000, dmg: 26, color: '#79b04a', size: 2.0, final: true } },
+      { name: 'Gas Station',  length: 200, zhp: 26, zdmg: 15, density: 1.0, power: 400, types: ['walker'],
+        boss: { name: 'Brute',            hp: 1500,  dmg: 20, color: '#7dbb4a', size: 1.5 } },
+      { name: 'Main Street',      length: 220, zhp: 32, zdmg: 18, density: 1.1, power: 650, types: ['walker', 'runner'],
+        boss: { name: 'Chomper',          hp: 2500, dmg: 24, color: '#8cc63f', size: 1.55 } },
+      { name: 'Broken Bridge',  length: 240, zhp: 38, zdmg: 21, density: 1.2, power: 1000, types: ['walker', 'runner'],
+        boss: { name: 'Big Mouth',        hp: 3800, dmg: 28, color: '#6aa84f', size: 1.6 } },
+      { name: 'Subway Tunnel',     length: 260, zhp: 50, zdmg: 25, density: 1.3, power: 1500, types: ['walker', 'runner', 'tank'],
+        boss: { name: 'Sewer Hulk',       hp: 6500, dmg: 32, color: '#5e9e6e', size: 1.7 } },
+      { name: 'Toxic Factory',   length: 280, zhp: 64, zdmg: 29, density: 1.4, power: 2300, types: ['walker', 'runner', 'tank'],
+        boss: { name: 'Toxic Butcher',    hp: 9500, dmg: 37, color: '#a3d13b', size: 1.75 } },
+      { name: 'City Hall', length: 300, zhp: 80, zdmg: 34, density: 1.5, power: 3400, types: ['walker', 'runner', 'tank'],
+        boss: { name: 'Mayor Rot',        hp: 15000, dmg: 44, color: '#79b04a', size: 2.0, final: true } },
     ],
   },
 ];
 
 const ZOMBIE_TYPES = {
-  walker: { hpMult: 1,   speed: 1.2, size: 1,    color: '#f28a3c', score: 10 },
-  runner: { hpMult: 0.6, speed: 3.4, size: 0.85, color: '#e8563a', score: 12 },
-  tank:   { hpMult: 3.5, speed: 1.0, size: 1.35, color: '#8cbf4a', score: 30 },
+  walker: { hpMult: 1,   speed: 1.6, size: 1,    color: '#f28a3c', score: 10 },
+  runner: { hpMult: 0.6, speed: 4.0, size: 0.85, color: '#e8563a', score: 12 },
+  tank:   { hpMult: 3,   speed: 1.1, size: 1.35, color: '#8cbf4a', score: 30 },
 };
 
 const BOT_NAMES = [

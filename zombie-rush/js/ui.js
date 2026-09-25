@@ -7,6 +7,7 @@ const UI = (() => {
   let tab = 2;
   let selectedLevel = 0;
   let gearFilter = 'all';
+  let shopTab = 'chests';
   let sceneRaf = 0;
   let paused = false;
 
@@ -244,9 +245,9 @@ const UI = (() => {
     const inv = save.inventory
       .filter(i => gearFilter === 'all' || i.slot === gearFilter)
       .sort((a, b) => b.rarity - a.rarity || itemStat(b) - itemStat(a));
-    const filters = [['all', 'All', ''], ...SLOTS.map(s => [s.id, s.name, icon(s.id, '#fff', 20)])]
-      .map(([id, name, ic]) => `<button class="filter tx ${gearFilter === id ? 'on' : ''}" data-filter="${id}">${ic}${name}</button>`).join('');
-    const stat = (k, label, val) => `<div class="stat">${statIcon(k)}<div><span class="stat-label">${label}</span><span class="stat-val tx">${val}</span></div></div>`;
+    const filters = [['all', 'All', ''], ...SLOTS.map(s => [s.id, '', icon(s.id, '#fff', 20)])]
+      .map(([id, name, ic]) => `<button class="filter tx ${gearFilter === id ? 'on' : ''}" data-filter="${id}" aria-label="${id}">${ic}${name}</button>`).join('');
+    const stat = (k, val) => `<div class="stat">${statIcon(k)}<span class="stat-val tx">${val}</span></div>`;
 
     $('#screen-gear').innerHTML = `
       <div class="ribbon purple"><span class="tx">Gear</span></div>
@@ -255,21 +256,29 @@ const UI = (() => {
         <div class="gear-hero"><canvas id="gear-canvas" width="300" height="345"></canvas></div>
         <div class="gear-col">${slotHtml(SLOTS[1])}${slotHtml(SLOTS[3])}</div>
       </div>
-      <div class="panel stats-grid">
-        ${stat('hp', 'Health', fmt(st.hp))}
-        ${stat('dmg', 'Damage', fmt(st.dmg))}
-        ${stat('rate', 'Shots / sec', st.rate.toFixed(1))}
-        ${stat('crit', 'Crit chance', Math.round(st.crit * 100) + '%')}
+      <div class="stats-row">
+        ${stat('hp', fmt(st.hp))}${stat('dmg', fmt(st.dmg))}${stat('rate', st.rate.toFixed(1) + '/s')}${stat('crit', Math.round(st.crit * 100) + '%')}
       </div>
-      <div class="sub-head"><h3 class="tx">Backpack · ${save.inventory.length}</h3><button class="btn small green" id="equip-best"><span class="tx">Equip best</span></button></div>
-      <div class="filters">${filters}</div>
-      <div class="inventory">${inv.length ? inv.map(i => tile(i)).join('') : '<div class="empty-note">No gear here yet. Open chests in the Shop to find some.</div>'}</div>`;
+      <div class="sub-head"><h3 class="tx">Backpack · ${save.inventory.length}</h3><div class="filters">${filters}</div></div>
+      <div class="inventory" id="inventory">${inv.length ? inv.map(i => tile(i)).join('') : '<div class="empty-note">No gear here yet. Open chests in the Shop to find some.</div>'}</div>
+      <button class="btn green" id="equip-best"><span class="tx">Equip best</span></button>`;
 
     drawSoldierFront($('#gear-canvas').getContext('2d'), 150, 330, 290, 0);
+    fitInventory();
     const s = $('#screen-gear');
     s.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
     s.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { gearFilter = b.dataset.filter; render('gear'); }));
-    $('#equip-best').onclick = () => { equipBest(); render('gear'); toast('Best gear equipped'); };
+    $('#equip-best').onclick = () => { equipBest(); Sound.play('equip'); render('gear'); toast('Best gear equipped'); };
+  }
+
+  // Backpack scrolls sideways: use as many rows as fit the leftover height.
+  function fitInventory() {
+    const inv = $('#inventory');
+    if (!inv || tab !== 1) return;
+    const size = Math.min(76, Math.max(56, Math.floor(inv.clientHeight / 2) - 12));
+    const rows = Math.max(1, Math.floor((inv.clientHeight + 10) / (size + 10)));
+    inv.style.setProperty('--tile', size + 'px');
+    inv.style.setProperty('--rows', rows);
   }
 
   function statLine(item) {
@@ -301,8 +310,8 @@ const UI = (() => {
                   <button class="btn green" id="m-equip"><span class="tx">Equip</span></button>`}
       </div>`, { close: true, ribbon: 'purple' });
     if (!isEq) {
-      $('#m-equip').onclick = () => { equip(item.id); closeModal(); render('gear'); toast('Equipped'); };
-      $('#m-salvage').onclick = () => { const v = salvage(item.id); closeModal(); render('gear'); toast(`Sold for ${v} coins`); };
+      $('#m-equip').onclick = () => { equip(item.id); Sound.play('equip'); closeModal(); render('gear'); toast('Equipped'); };
+      $('#m-salvage').onclick = () => { const v = salvage(item.id); Sound.play('coin'); closeModal(); render('gear'); toast(`Sold for ${v} coins`); };
     }
   }
 
@@ -327,8 +336,7 @@ const UI = (() => {
             ${max ? '<span class="tx">MAX</span>' : `<span class="tx">${icon('coin')}${fmt(cost)}</span><small class="tx">UPGRADE</small>`}
           </button>
         </div>`;
-      }).join('')}
-      <p class="note">Skills are permanent. Win levels to earn more coins.</p>`;
+      }).join('')}`;
     $('#screen-skills').querySelectorAll('[data-skill]').forEach(b => b.addEventListener('click', () => {
       const id = b.dataset.skill;
       const cost = skillCost(save.skills[id]);
@@ -336,6 +344,7 @@ const UI = (() => {
       save.coins -= cost;
       save.skills[id]++;
       persist();
+      Sound.play('upgrade');
       render('skills');
       toast(`${SKILLS.find(s => s.id === id).name} Lv ${save.skills[id]}`);
     }));
@@ -346,42 +355,48 @@ const UI = (() => {
   function renderShop() {
     const chestStyle = { wood: ['', 'rgba(255,170,80,.7)', ''], silver: ['teal', 'rgba(160,255,240,.7)', ''], gold: ['purple', 'rgba(255,215,90,.85)', 'BEST'] };
     const odds = o => o.map((p, i) => p ? `<span class="tx" style="color:${RARITIES[i].color}">${RARITIES[i].name.slice(0, 4)} ${p}%</span>` : '').join('');
+    const tabs = [['chests', 'Chests', 'chest', '#c98b4a'], ['coins', 'Coins', 'coin', ''], ['gems', 'Gems', 'gem', '']]
+      .map(([id, label, ic, c]) => `<button class="seg tx ${shopTab === id ? 'on' : ''}" data-shoptab="${id}">${icon(ic, c)}${label}</button>`).join('');
+    let cards = '';
+    if (shopTab === 'chests') {
+      cards = CHESTS.map(c => {
+        const [cls, glow, flag] = chestStyle[c.id];
+        return `<div class="panel offer ${cls}" style="--glow:${glow}">
+          ${flag ? `<span class="flag tx">${flag}</span>` : ''}
+          <div class="art">${icon('chest', c.color)}</div>
+          <div class="title tx">${c.name}</div>
+          <div class="odds">${odds(c.odds)}</div>
+          <button class="btn ${c.currency === 'gems' ? 'blue' : ''}" data-chest="${c.id}">${icon(c.currency === 'gems' ? 'gem' : 'coin')}<span class="tx">${fmt(c.price)}</span></button>
+        </div>`;
+      }).join('');
+    } else if (shopTab === 'coins') {
+      cards = COIN_PACKS.map((p, i) => `<div class="panel offer orange" style="--glow:rgba(255,230,120,.8)">
+        ${i === 2 ? '<span class="flag tx">+25%</span>' : ''}
+        <div class="art">${icon('coin')}</div>
+        <div class="title tx">${fmt(p.coins)} coins</div>
+        <button class="btn blue" data-coins="${i}">${icon('gem')}<span class="tx">${p.gems}</span></button>
+      </div>`).join('');
+    } else {
+      cards = GEM_PACKS.map((p, i) => `<div class="panel offer teal" style="--glow:rgba(120,255,200,.8)">
+        <span class="flag tx">TEST</span>
+        <div class="art">${icon('gem')}</div>
+        <div class="title tx">${fmt(p.gems)} gems</div>
+        <button class="btn green" data-gems="${i}"><span class="tx">FREE</span></button>
+      </div>`).join('');
+    }
+    const notes = {
+      chests: 'Every chest gives one piece of gear. Better chests give higher rarities.',
+      coins: 'Trade gems for coins to upgrade your skills faster.',
+      gems: 'Test build: gem packs are free so you can try chests. There are no real payments.',
+    };
     $('#screen-shop').innerHTML = `
       <div class="ribbon pink"><span class="tx">Shop</span></div>
-      <div class="sub-head"><h3 class="tx">Chests</h3></div>
-      <div class="shop-grid">
-        ${CHESTS.map(c => {
-          const [cls, glow, flag] = chestStyle[c.id];
-          return `<div class="panel offer ${cls}" style="--glow:${glow}">
-            ${flag ? `<span class="flag tx">${flag}</span>` : ''}
-            <div class="art">${icon('chest', c.color)}</div>
-            <div class="title tx">${c.name}</div>
-            <div class="odds">${odds(c.odds)}</div>
-            <button class="btn ${c.currency === 'gems' ? 'blue' : ''}" data-chest="${c.id}">${icon(c.currency === 'gems' ? 'gem' : 'coin')}<span class="tx">${fmt(c.price)}</span></button>
-          </div>`;
-        }).join('')}
-      </div>
-      <div class="sub-head"><h3 class="tx">Coins</h3></div>
-      <div class="shop-grid">
-        ${COIN_PACKS.map((p, i) => `<div class="panel offer orange" style="--glow:rgba(255,230,120,.8)">
-          ${i === 2 ? '<span class="flag tx">+25%</span>' : ''}
-          <div class="art">${icon('coin')}</div>
-          <div class="title tx">${fmt(p.coins)}</div>
-          <button class="btn blue" data-coins="${i}">${icon('gem')}<span class="tx">${p.gems}</span></button>
-        </div>`).join('')}
-      </div>
-      <div class="sub-head"><h3 class="tx">Gems</h3></div>
-      <div class="shop-grid">
-        ${GEM_PACKS.map((p, i) => `<div class="panel offer teal" style="--glow:rgba(120,255,200,.8)">
-          <span class="flag tx">TEST</span>
-          <div class="art">${icon('gem')}</div>
-          <div class="title tx">${fmt(p.gems)}</div>
-          <button class="btn green" data-gems="${i}"><span class="tx">FREE</span></button>
-        </div>`).join('')}
-      </div>
-      <p class="note">Test build: gem packs are free so you can try chests. There are no real payments.</p>`;
+      <div class="segs">${tabs}</div>
+      <div class="shop-grid">${cards}</div>
+      <p class="note">${notes[shopTab]}</p>`;
 
     const s = $('#screen-shop');
+    s.querySelectorAll('[data-shoptab]').forEach(b => b.addEventListener('click', () => { shopTab = b.dataset.shoptab; render('shop'); }));
     s.querySelectorAll('[data-chest]').forEach(b => b.addEventListener('click', () => {
       const c = CHESTS.find(x => x.id === b.dataset.chest);
       if (save[c.currency] < c.price) { toast(`Not enough ${c.currency}`); return; }
@@ -393,11 +408,11 @@ const UI = (() => {
     s.querySelectorAll('[data-coins]').forEach(b => b.addEventListener('click', () => {
       const p = COIN_PACKS[+b.dataset.coins];
       if (save.gems < p.gems) { toast('Not enough gems'); return; }
-      save.gems -= p.gems; save.coins += p.coins; persist(); render('shop'); toast(`+${fmt(p.coins)} coins`);
+      save.gems -= p.gems; save.coins += p.coins; persist(); Sound.play('coin'); render('shop'); toast(`+${fmt(p.coins)} coins`);
     }));
     s.querySelectorAll('[data-gems]').forEach(b => b.addEventListener('click', () => {
       const p = GEM_PACKS[+b.dataset.gems];
-      save.gems += p.gems; persist(); render('shop'); toast(`+${fmt(p.gems)} gems`);
+      save.gems += p.gems; persist(); Sound.play('coin'); render('shop'); toast(`+${fmt(p.gems)} gems`);
     }));
   }
 
@@ -407,7 +422,9 @@ const UI = (() => {
     sheet(chest.name, `
       <div class="rays-wrap" style="--glow:${chest.color}"><div class="rays"></div><div class="shake">${icon('chest', chest.color, 120)}</div></div>
       <p>Opening…</p>`);
+    Sound.play('chest');
     setTimeout(() => {
+      Sound.play('reveal');
       const cur = getItem(save.equipped[item.slot]);
       const better = !cur || itemStat(item) > itemStat(cur);
       sheet(chest.name, `
@@ -422,7 +439,7 @@ const UI = (() => {
         </div>`, { ribbon: item.rarity >= 3 ? '' : item.rarity === 2 ? 'purple' : 'blue' });
       const done = () => { closeModal(); render(TAB_IDS[tab]); after && after(); };
       $('#m-ok').onclick = done;
-      if (better) $('#m-equip').onclick = () => { equip(item.id); toast('Equipped'); done(); };
+      if (better) $('#m-equip').onclick = () => { equip(item.id); Sound.play('equip'); toast('Equipped'); done(); };
     }, 1100);
   }
 
@@ -447,7 +464,7 @@ const UI = (() => {
     const all = [...bots, { name: save.name, score: totalScore(), me: true }].sort((a, b) => b.score - a.score);
     const meIdx = all.findIndex(p => p.me);
     const pod = (p, place, cls) => `<div class="pod ${cls}">
-      ${avatar(p)}<span class="nm tx">${p.name}</span><span class="sc tx">${fmt(p.score)}</span>
+      ${avatar(p)}<span class="nm tx">${p.name}${p.me ? ' (you)' : ''}</span><span class="sc tx">${fmt(p.score)}</span>
       <div class="block tx">${place}</div></div>`;
     const row = (p, i) => `<div class="rank ${p.me ? 'me' : ''}">
       <span class="pos tx">${i + 1}</span>${avatar(p)}
@@ -457,19 +474,90 @@ const UI = (() => {
     $('#screen-ranks').innerHTML = `
       <div class="ribbon blue"><span class="tx">Leaderboard</span></div>
       <div class="podium">${pod(all[1], 2, 'second')}${pod(all[0], 1, 'first')}${pod(all[2], 3, 'third')}</div>
-      <div class="rank-list">${all.slice(3).map((p, i) => row(p, i + 3)).join('')}${meIdx < 3 ? row(all[meIdx], meIdx) : ''}</div>
-      <p class="note">Your score is the sum of your best score on every level. The other players are local test bots.</p>
-      <div class="actions">
-        <button class="btn small blue" id="rename-btn"><span class="tx">Change name</span></button>
-        <button class="btn small red" id="reset-btn"><span class="tx">Reset progress</span></button>
-      </div>`;
-    $('#rename-btn').onclick = rename;
-    $('#reset-btn').onclick = () => {
-      sheet('Reset?', `<p>This deletes all coins, gear and level progress on this device.</p>
-        <div class="actions"><button class="btn grey" id="m-no"><span class="tx">Cancel</span></button><button class="btn red" id="m-yes"><span class="tx">Reset</span></button></div>`, { ribbon: 'red' });
-      $('#m-no').onclick = closeModal;
-      $('#m-yes').onclick = () => { resetSave(); selectedLevel = 0; closeModal(); setTab(2); toast('Progress reset'); };
+      <div class="rank-list" id="rank-list">${all.slice(3).map((p, i) => p.me ? '' : row(p, i + 3)).join('')}</div>
+      ${meIdx >= 3 ? row(all[meIdx], meIdx) : ''}`;
+    fitRanks();
+  }
+
+  // Show only the rows that fit, so the screen never scrolls.
+  function fitRanks() {
+    const list = $('#rank-list');
+    if (!list || tab !== 4) return;
+    while (list.lastElementChild && list.scrollHeight > list.clientHeight + 1) list.lastElementChild.remove();
+  }
+
+  function settings() {
+    const st = save.settings;
+    sheet('Settings', `
+      <div class="profile-card">
+        <span class="avatar big"><canvas id="m-avatar" width="120" height="120"></canvas></span>
+        <div>
+          <div class="item-name tx">${save.name}</div>
+          <div class="profile-power tx">${icon('bolt', '#ffc933')}${fmt(playerStats().power)} · ${icon('star', '#ffc933')}${totalStars()}/18</div>
+        </div>
+      </div>
+      <label class="set-row" for="set-music">${icon('music', '#ff5fb4')}<span class="tx">Music</span>
+        <input type="range" id="set-music" min="0" max="100" value="${Math.round(st.music * 100)}"><b class="tx" id="set-music-v">${Math.round(st.music * 100)}</b></label>
+      <label class="set-row" for="set-sfx">${icon('sound', '#29a8ff')}<span class="tx">Sound FX</span>
+        <input type="range" id="set-sfx" min="0" max="100" value="${Math.round(st.sfx * 100)}"><b class="tx" id="set-sfx-v">${Math.round(st.sfx * 100)}</b></label>
+      <div class="set-grid">
+        <button class="btn small blue" id="m-rename"><span class="tx">Change name</span></button>
+        <button class="btn small purple" id="m-credits"><span class="tx">Credits</span></button>
+        <button class="btn small" id="m-privacy"><span class="tx">Privacy</span></button>
+        <button class="btn small red" id="m-reset"><span class="tx">Reset progress</span></button>
+      </div>
+      <p class="version">Zombie Rush · test build</p>`, { close: true, ribbon: 'blue' });
+    drawSoldierFront($('#m-avatar').getContext('2d'), 60, 190, 180, 0);
+    const bind = key => {
+      const input = $(`#set-${key}`);
+      input.style.setProperty('--fill', input.value + '%');
+      input.addEventListener('input', () => {
+        input.style.setProperty('--fill', input.value + '%');
+        save.settings[key] = input.value / 100;
+        $(`#set-${key}-v`).textContent = input.value;
+        applySettings();
+      });
+      input.addEventListener('change', () => { persist(); if (key === 'sfx') Sound.play('coin'); });
     };
+    bind('music'); bind('sfx');
+    $('#m-rename').onclick = rename;
+    $('#m-credits').onclick = credits;
+    $('#m-privacy').onclick = privacy;
+    $('#m-reset').onclick = confirmReset;
+  }
+
+  function applySettings() { Sound.setVolumes(save.settings.music, save.settings.sfx); }
+
+  function subPage(title, body, ribbon) {
+    sheet(title, `<div class="doc">${body}</div>
+      <div class="actions"><button class="btn grey" id="m-back"><span class="tx">Back</span></button></div>`, { close: true, ribbon });
+    $('#m-back').onclick = settings;
+  }
+
+  function credits() {
+    subPage('Credits', `
+      <dl>
+        <dt class="tx">Game</dt><dd>Zombie Rush</dd>
+        <dt class="tx">Design &amp; code</dt><dd>Made with Claude Code</dd>
+        <dt class="tx">Art</dt><dd>Hand-drawn in code: every soldier, zombie and prop is drawn live on a canvas</dd>
+        <dt class="tx">Music &amp; sound</dt><dd>Synthesized live in your browser with the Web Audio API</dd>
+        <dt class="tx">Font</dt><dd>Lilita One by Juan Montoreano (SIL Open Font License)</dd>
+      </dl>
+      <p>Thanks for playing!</p>`, 'purple');
+  }
+
+  function privacy() {
+    subPage('Privacy', `
+      <p>Your progress (coins, gems, gear, skills, level stars, name and sound settings) is saved only on this device, in your browser's local storage.</p>
+      <p>Nothing is sent to a server. There are no accounts, ads, analytics or tracking.</p>
+      <p>The other leaderboard players are local bots. Clearing your browser data or using Reset progress deletes your save.</p>`, '');
+  }
+
+  function confirmReset() {
+    sheet('Reset?', `<p>This deletes all coins, gear and level progress on this device.</p>
+      <div class="actions"><button class="btn grey" id="m-no"><span class="tx">Cancel</span></button><button class="btn red" id="m-yes"><span class="tx">Reset</span></button></div>`, { ribbon: 'red' });
+    $('#m-no').onclick = settings;
+    $('#m-yes').onclick = () => { resetSave(); applySettings(); selectedLevel = 0; closeModal(); setTab(2); toast('Progress reset'); };
   }
 
   function rename() {
@@ -478,12 +566,12 @@ const UI = (() => {
     const input = $('#m-name');
     input.value = save.name;
     input.focus(); input.select();
-    $('#m-no').onclick = closeModal;
+    $('#m-no').onclick = settings;
     $('#m-yes').onclick = () => {
       const v = input.value.replace(/[<>&"]/g, '').trim().slice(0, 14);
       if (v) { save.name = v; persist(); }
-      closeModal();
       render(TAB_IDS[tab]);
+      settings();
     };
   }
 
@@ -613,7 +701,18 @@ const UI = (() => {
     $('#hud-pause').addEventListener('click', () => togglePause());
     document.querySelectorAll('.navbar .tab').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.goto)));
-    $('#profile-btn').addEventListener('click', rename);
+    $('#profile-btn').addEventListener('click', settings);
+    // Soft click for every menu button (the game view has its own sounds).
+    document.getElementById('app').addEventListener('pointerdown', e => {
+      if (e.target.closest('button') && $('#game-view').hidden) Sound.play('click');
+      else if (e.target.closest('.hud-pause, .sheet button')) Sound.play('click');
+    });
+    window.addEventListener('resize', () => { fitInventory(); if (tab === 4) renderRanks(); });
+    // Screens slide with a transform; never let focus or scrollIntoView nudge them.
+    const lockScroll = el => el.addEventListener('scroll', () => { el.scrollLeft = 0; el.scrollTop = 0; });
+    lockScroll(document.querySelector('.screens'));
+    document.querySelectorAll('.screen').forEach(lockScroll);
+    applySettings();
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal' && $('#m-close')) closeModal();
     });
