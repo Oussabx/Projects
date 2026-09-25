@@ -194,7 +194,7 @@ const Game = (() => {
 
   function spawnGroup(z) {
     const cfg = run.cfg;
-    const count = Math.round((6 + Math.random() * 6) * cfg.density + run.gl * 0.8);
+    const count = Math.round((8 + Math.random() * 7) * cfg.density + run.gl * 1.2);
     const cx = rand(-0.45, 0.45);
     const gid = run.nextGid++;
     run.groups[gid] = { total: count, alive: count };
@@ -215,8 +215,8 @@ const Game = (() => {
       const roll = Math.random();
       const drop = roll < 0.5 ? 'squad' : roll < 0.58 ? 'minigun' : roll < 0.66 ? 'rocket' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
       const base = drop === 'squad' ? 1.3 : drop === 'minigun' || drop === 'rocket' ? 1.7 : 1;
-      const hp = Math.round((40 + run.gl * 45) * base * rand(0.8, 1.6) / 10) * 10;
-      const gain = Math.round(rand(4, 8) + run.gl * 1.3);
+      const hp = Math.round((55 + run.gl * 60) * base * rand(0.8, 1.6) / 10) * 10;
+      const gain = Math.round(rand(3, 6) + run.gl * 1.0);
       run.barrels.push({ x, z, hp, maxHp: hp, drop, gain, acc: 0, accT: 0, t: Math.random() * 9 });
     }
   }
@@ -224,8 +224,8 @@ const Game = (() => {
   function gateOption(good) {
     if (good) {
       return pick([
-        { type: 'squad', val: Math.round(rand(5, 12) + run.gl) },
-        { type: 'squad', val: Math.round(rand(5, 12) + run.gl) },
+        { type: 'squad', val: Math.round(rand(4, 9) + run.gl * 0.8) },
+        { type: 'squad', val: Math.round(rand(4, 9) + run.gl * 0.8) },
         { type: 'mult', val: 2 },
         { type: 'dmg', val: Math.round(rand(15, 40)) },
         { type: 'rate', val: Math.round(rand(15, 40)) },
@@ -243,7 +243,7 @@ const Game = (() => {
 
   function spawnGate(z) {
     const a = gateOption(true);
-    let b = gateOption(Math.random() < 0.3);
+    let b = gateOption(Math.random() < 0.45);
     if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     run.gates.push({ z, sides: [{ side: -1, ...sides[0] }, { side: 1, ...sides[1] }] });
@@ -311,7 +311,7 @@ const Game = (() => {
       while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len - 10) {
         const z = r.nextSpawn - r.dist;
         if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(15, 20); }
-        else if (Math.random() < 0.5) spawnBarrel(z);
+        else if (Math.random() < 0.42) spawnBarrel(z);
         else spawnGroup(z);
         r.nextSpawn += rand(4.5, 7) / r.cfg.density;
       }
