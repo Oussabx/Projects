@@ -103,7 +103,7 @@ const Game = (() => {
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
       weapon: equippedWeapon(), leaderCd: 0.2,
-      squad: 6, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
+      squad: 6 + Math.max(0, 3 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
@@ -185,7 +185,7 @@ const Game = (() => {
     const zt = ZOMBIE_TYPES[type];
     const hp = Math.round(run.cfg.zhp * zt.hpMult);
     run.zombies.push({
-      gid, acc: 0, accT: 0,
+      gid, acc: 0, accT: 0, seed: Math.random() * 10,
       type, x, z, hp, maxHp: hp, speed: zt.speed * 1.6 * rand(0.85, 1.15), size: zt.size,
       color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
@@ -194,7 +194,8 @@ const Game = (() => {
 
   function spawnGroup(z) {
     const cfg = run.cfg;
-    const count = Math.round((8 + Math.random() * 7) * cfg.density + run.gl * 1.2);
+    const early = Math.max(0, 3 - run.gl) / 3;   // 1 on level 1, fades to 0 by level 4
+    const count = Math.round((8 + Math.random() * 7) * cfg.density * (1 - early * 0.35) + run.gl * 1.2);
     const cx = rand(-0.45, 0.45);
     const gid = run.nextGid++;
     run.groups[gid] = { total: count, alive: count };
@@ -216,7 +217,7 @@ const Game = (() => {
       const drop = roll < 0.5 ? 'squad' : roll < 0.58 ? 'minigun' : roll < 0.66 ? 'rocket' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
       const base = drop === 'squad' ? 1.3 : drop === 'minigun' || drop === 'rocket' ? 1.7 : 1;
       const hp = Math.round((55 + run.gl * 60) * base * rand(0.8, 1.6) / 10) * 10;
-      const gain = Math.round(rand(3, 6) + run.gl * 1.0);
+      const gain = Math.round(rand(3, 6) + run.gl * 1.0 + Math.max(0, 3 - run.gl) * 1.5);
       run.barrels.push({ x, z, hp, maxHp: hp, drop, gain, acc: 0, accT: 0, t: Math.random() * 9 });
     }
   }
@@ -243,7 +244,7 @@ const Game = (() => {
 
   function spawnGate(z) {
     const a = gateOption(true);
-    let b = gateOption(Math.random() < 0.45);
+    let b = gateOption(Math.random() < (run.gl < 2 ? 0.25 : 0.45));
     if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     run.gates.push({ z, sides: [{ side: -1, ...sides[0] }, { side: 1, ...sides[1] }] });
@@ -311,7 +312,7 @@ const Game = (() => {
       while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len - 10) {
         const z = r.nextSpawn - r.dist;
         if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(15, 20); }
-        else if (Math.random() < 0.42) spawnBarrel(z);
+        else if (Math.random() < 0.42 + Math.max(0, 3 - r.gl) * 0.05) spawnBarrel(z);
         else spawnGroup(z);
         r.nextSpawn += rand(4.5, 7) / r.cfg.density;
       }
@@ -919,7 +920,7 @@ const Game = (() => {
         list.push({ z: sl.z, fn: () => { const p = proj(sl.x, sl.z); drawTrooper(ctx, p.x, p.y, 0.4 * roadW * p.s, r.t, { phase: sl.ph }); } });
       }
     }
-    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.62 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb }); } });
+    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.62 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb, seed: z.seed }); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;

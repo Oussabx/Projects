@@ -219,7 +219,7 @@ const UI = (() => {
     const c = cv.getContext('2d');
     const lvl = CHAPTERS[selectedChapter].levels[selectedLevel];
     const theme = CHAPTERS[selectedChapter].theme;
-    const colors = ['#f28a3c', '#e8563a', '#ff9d4a', '#8cbf4a'];
+    const colors = ['#8fbf5a', '#b5c95a', '#9ab872', '#6f9a74'];
     const walkers = Array.from({ length: 7 }, (_, i) => ({ x: (i / 6) * 1.6 - 0.8, z: 0.3 + ((i * 37) % 10) / 20, t: i * 1.3, color: colors[i % 4] }));
     const t0 = performance.now();
     const frame = now => {
@@ -286,7 +286,7 @@ const UI = (() => {
     const ch2 = !!th.mesas;
     walkers.forEach((z, i) => {
       const y = hz + (h - hz) * z.z * 0.55;
-      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: '#6b4fb8', helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
+      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: ['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff'][i % 4], seed: i * 1.37, helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
     });
     if (ch2) { drawCactus(c, w * 0.1, h * 0.95, h * 0.26); drawDrum(c, w * 0.9, h * 0.97, h * 0.15); }
     else { drawCone(c, w * 0.1, h * 0.93, h * 0.13); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
@@ -782,7 +782,7 @@ const UI = (() => {
           <button class="btn grey" id="m-home"><span class="tx">Home</span></button>
           <button class="btn" id="m-retry"><span class="tx">Retry</span></button>
         </div>`, { ribbon: 'red', cls: 'defeat' });
-      drawZombie($('#m-art').getContext('2d'), 150, 250, 230, 0.4, { color: '#f28a3c', shirt: '#6b4fb8' });
+      drawZombie($('#m-art').getContext('2d'), 150, 250, 230, 0.4, { color: '#8fbf5a', shirt: '#6b4fb8', seed: 0.2 });
       $('#m-skills').onclick = () => leaveGame(3);
       $('#m-gear').onclick = () => leaveGame(1);
     }

@@ -80,10 +80,10 @@ const CHAPTERS = [
       bridge: true,
     },
     levels: [
-      { name: 'Gas Station',  length: 200, zhp: 30, zdmg: 13, density: 0.9, power: 400, types: ['walker'],
-        boss: { name: 'Brute',            hp: 2100,  dmg: 20, color: '#7dbb4a', size: 1.5 } },
-      { name: 'Main Street',      length: 220, zhp: 48, zdmg: 18, density: 1.1, power: 800, types: ['walker', 'runner'],
-        boss: { name: 'Chomper',          hp: 3500, dmg: 24, color: '#8cc63f', size: 1.55 } },
+      { name: 'Gas Station',  length: 200, zhp: 18, zdmg: 10, density: 0.8, power: 400, types: ['walker'],
+        boss: { name: 'Brute',            hp: 1200,  dmg: 20, color: '#7dbb4a', size: 1.5 } },
+      { name: 'Main Street',      length: 220, zhp: 30, zdmg: 18, density: 1.1, power: 800, types: ['walker', 'runner'],
+        boss: { name: 'Chomper',          hp: 2800, dmg: 24, color: '#8cc63f', size: 1.55 } },
       { name: 'Broken Bridge',  length: 240, zhp: 57, zdmg: 21, density: 1.2, power: 1300, types: ['walker', 'runner'],
         boss: { name: 'Big Mouth',        hp: 5300, dmg: 28, color: '#6aa84f', size: 1.6 } },
       { name: 'Subway Tunnel',     length: 260, zhp: 75, zdmg: 25, density: 1.3, power: 2500, types: ['walker', 'runner', 'tank'],
@@ -123,11 +123,11 @@ const CHAPTERS = [
 ];
 
 const ZOMBIE_TYPES = {
-  walker: { hpMult: 1,   speed: 1.6, size: 1,    color: '#f28a3c', score: 10 },
-  runner: { hpMult: 0.7, speed: 4.4, size: 0.85, color: '#e8563a', score: 12 },
-  tank:   { hpMult: 3,   speed: 1.1, size: 1.35, color: '#8cbf4a', score: 30 },
-  armored: { hpMult: 2.2, speed: 1.3, size: 1.1, color: '#e0a04a', score: 20, helmet: true },
-  bomber:  { hpMult: 0.6, speed: 5.0, size: 0.8, color: '#ff5a4a', score: 15, bomb: true, contact: 2.5 },
+  walker: { hpMult: 1,   speed: 1.6, size: 1,    color: '#8fbf5a', score: 10 },
+  runner: { hpMult: 0.7, speed: 4.4, size: 0.85, color: '#b5c95a', score: 12 },
+  tank:   { hpMult: 3,   speed: 1.1, size: 1.35, color: '#6f9a74', score: 30 },
+  armored: { hpMult: 2.2, speed: 1.3, size: 1.1, color: '#9ab872', score: 20, helmet: true },
+  bomber:  { hpMult: 0.6, speed: 5.0, size: 0.8, color: '#a6c46a', score: 15, bomb: true, contact: 2.5 },
 };
 
 const BOT_NAMES = [
