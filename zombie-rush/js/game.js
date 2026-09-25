@@ -7,7 +7,7 @@ const Game = (() => {
   const ROAD = 1;          // road half-width in world units
   const BULLET_SPEED = 30;
   const RANGE = 13;        // bullets fade out here, so fights happen mid-screen
-  const RUN_SPEED = 6;
+  const RUN_SPEED = 2;        // you creep forward; enemies walk to you
   const MAX_SHOTS = 5;
   const MAX_SQUAD = 150;
   const SHOW_SQUAD = 80;    // soldiers drawn; the rest are only counted
@@ -32,6 +32,7 @@ const Game = (() => {
       boss: document.getElementById('hud-boss'),
       bossName: document.getElementById('hud-boss-name'),
       bossFill: document.getElementById('hud-boss-fill'),
+      bossHp: document.getElementById('hud-boss-hp'),
       banner: document.getElementById('hud-banner'),
       kills: document.getElementById('hud-kills'),
     };
@@ -96,7 +97,7 @@ const Game = (() => {
     const stats = playerStats();
     onEnd = endCallback;
     run = {
-      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, theme: CHAPTERS[chIdx].theme,
+      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, len: Math.round(cfg.length * 0.4), theme: CHAPTERS[chIdx].theme,
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
@@ -105,7 +106,7 @@ const Game = (() => {
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
       zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [],
-      nextSpawn: 16, nextGate: 22, nextProp: 0,
+      nextSpawn: 9, nextGate: 14, nextProp: 0,
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
@@ -143,7 +144,7 @@ const Game = (() => {
     Sound.play(win ? 'victory' : 'defeat');
     const cb = onEnd;
     run = null;
-    cb({ win, chIdx: r.chIdx, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, squad: r.squad, reached: r.dist / r.cfg.length });
+    cb({ win, chIdx: r.chIdx, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, squad: r.squad, reached: r.dist / r.len });
   }
 
   function showBanner(text, dur, kind = '') {
@@ -183,7 +184,7 @@ const Game = (() => {
     const hp = Math.round(run.cfg.zhp * zt.hpMult);
     run.zombies.push({
       gid, acc: 0, accT: 0,
-      type, x, z, hp, maxHp: hp, speed: zt.speed * rand(0.85, 1.15), size: zt.size,
+      type, x, z, hp, maxHp: hp, speed: zt.speed * 1.6 * rand(0.85, 1.15), size: zt.size,
       color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
     });
@@ -213,7 +214,7 @@ const Game = (() => {
       const drop = roll < 0.5 ? 'squad' : roll < 0.65 ? 'gatling' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
       const base = drop === 'squad' ? 1.3 : drop === 'gatling' ? 1.6 : 1;
       const hp = Math.round((40 + run.gl * 45) * base * rand(0.8, 1.6) / 10) * 10;
-      const gain = Math.round(rand(3, 7) + run.gl * 1.2);
+      const gain = Math.round(rand(4, 8) + run.gl * 1.3);
       run.barrels.push({ x, z, hp, maxHp: hp, drop, gain, acc: 0, accT: 0, t: Math.random() * 9 });
     }
   }
@@ -299,18 +300,18 @@ const Game = (() => {
     layoutSquad(dt);
 
     // Forward motion; stop for the boss fight.
-    const inBoss = r.dist >= r.cfg.length;
+    const inBoss = r.dist >= r.len;
     if (inBoss) r.speed = Math.max(0, r.speed - dt * 8);
     const move = r.speed * dt;
     r.dist += move;
 
     if (!inBoss) {
-      while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.cfg.length - 10) {
+      while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len - 10) {
         const z = r.nextSpawn - r.dist;
-        if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(34, 46); }
-        else if (Math.random() < 0.4) spawnBarrel(z);
+        if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(15, 20); }
+        else if (Math.random() < 0.5) spawnBarrel(z);
         else spawnGroup(z);
-        r.nextSpawn += rand(9, 14) / r.cfg.density;
+        r.nextSpawn += rand(4.5, 7) / r.cfg.density;
       }
     } else if (!r.boss) {
       spawnBoss();
@@ -846,16 +847,18 @@ const Game = (() => {
       ctx.beginPath(); ctx.moveTo(a.x, a.y - railH * 0.5 * roadW * a.s); ctx.lineTo(b.x, b.y - railH * 0.5 * roadW * b.s); ctx.stroke();
       void start;
     }
-    // Towers
-    for (let z = Z_FAR - ((r.dist + Z_FAR) % span); z > zNear + 1; z -= span) {
+    // Tower pillars at the sides only (no beams across the view)
+    for (let z = Z_FAR - ((r.dist + Z_FAR) % span); z > 2; z -= span) {
       if (z > Z_FAR) continue;
-      const lft = proj(-1.6, z), rgt = proj(1.6, z);
-      const th2 = 3.2 * roadW * lft.s, tw = Math.max(4, 0.16 * roadW * lft.s);
-      ctx.fillStyle = '#c42a28'; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
-      for (const q of [lft, rgt]) { ctx.fillRect(q.x - tw / 2, q.y - th2, tw, th2); ctx.strokeRect(q.x - tw / 2, q.y - th2, tw, th2); }
-      for (const f of [0.55, 0.85]) {
-        ctx.fillRect(lft.x, lft.y - th2 * f, rgt.x - lft.x, tw * 0.6); ctx.strokeRect(lft.x, lft.y - th2 * f, rgt.x - lft.x, tw * 0.6);
+      const fade = Math.min(1, (z - 2) / 4);
+      ctx.globalAlpha = fade;
+      for (const x of [-1.62, 1.62]) {
+        const q = proj(x, z);
+        const th2 = 2.6 * roadW * q.s, tw = Math.max(4, 0.14 * roadW * q.s);
+        ctx.fillStyle = '#c42a28'; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
+        ctx.fillRect(q.x - tw / 2, q.y - th2, tw, th2); ctx.strokeRect(q.x - tw / 2, q.y - th2, tw, th2);
       }
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -1124,9 +1127,14 @@ const Game = (() => {
     hud.hpFill.style.width = `${pct * 100}%`;
     hud.hpFill.classList.toggle('low', pct < 0.3);
     hud.hpText.textContent = `${Math.ceil(Math.max(0, r.hp))}`;
-    hud.prog.style.width = `${Math.min(1, r.dist / r.cfg.length) * 100}%`;
+    hud.prog.style.width = `${Math.min(1, r.dist / r.len) * 100}%`;
     hud.kills.textContent = r.squad;
-    if (r.boss) hud.bossFill.style.width = `${Math.max(0, r.boss.hp / r.boss.maxHp) * 100}%`;
+    if (r.boss) {
+      const bp = Math.max(0, r.boss.hp);
+      hud.bossFill.style.width = `${bp / r.boss.maxHp * 100}%`;
+      hud.bossHp.textContent = bp > 0 ? fmtN(Math.ceil(bp)) : '';
+      if (bp <= 0) hud.boss.hidden = true;
+    }
 
     const chips = [];
     const chip = (cls, ic, color, text) => chips.push(`<span class="buff tx ${cls}">${icon(ic, color, 18)}${text}</span>`);
