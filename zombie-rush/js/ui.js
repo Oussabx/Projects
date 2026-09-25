@@ -244,8 +244,8 @@ const UI = (() => {
     c.fillStyle = sky; c.fillRect(0, 0, w, hz);
     c.fillStyle = th.sun;
     c.beginPath(); c.arc(w * 0.72, hz * 0.5, h * 0.09, 0, Math.PI * 2); c.fill();
-    if (th.mesas) {
-      // Desert mesas
+    const bd = th.backdrop || (th.mesas ? 'mesas' : 'city');
+    if (bd === 'mesas') {
       const tops = [[0, 0.55], [0.18, 0.7], [0.42, 0.45], [0.62, 0.62], [0.85, 0.5]];
       tops.forEach(([x, hh], i) => {
         c.fillStyle = th.skyline[i % 2];
@@ -254,8 +254,32 @@ const UI = (() => {
         c.fillStyle = 'rgba(255,255,255,.12)';
         c.fillRect(w * x + mw * 0.08, top, mw * 0.64, 4);
       });
+    } else if (bd === 'peaks') {
+      [[0.05, 0.75], [0.3, 0.95], [0.55, 0.7], [0.8, 0.9], [1.02, 0.65]].forEach(([x, hh], i) => {
+        const top = hz - hz * hh * 0.85, bw = w * 0.34;
+        c.fillStyle = th.skyline[i % 2];
+        c.beginPath(); c.moveTo(w * x - bw / 2, hz); c.lineTo(w * x, top); c.lineTo(w * x + bw / 2, hz); c.fill();
+        c.fillStyle = '#ffffff';
+        c.beginPath(); c.moveTo(w * x - bw * 0.14, top + hz * 0.18); c.lineTo(w * x, top); c.lineTo(w * x + bw * 0.14, top + hz * 0.18);
+        c.lineTo(w * x + bw * 0.05, top + hz * 0.13); c.lineTo(w * x - bw * 0.04, top + hz * 0.2); c.closePath(); c.fill();
+      });
+    } else if (bd === 'swamp') {
+      c.fillStyle = th.skyline[0];
+      c.beginPath(); c.moveTo(0, hz);
+      for (let i = 0; i <= 10; i++) c.lineTo(w * i / 10, hz - hz * (0.15 + 0.1 * Math.sin(i * 1.7)));
+      c.lineTo(w, hz); c.fill();
+      for (let i = 0; i < 6; i++) drawDeadTree(c, w * (0.08 + i * 0.18), hz + 2, hz * (0.5 + (i % 3) * 0.12));
+      c.fillStyle = 'rgba(200,255,120,.18)';
+      c.fillRect(0, hz - hz * 0.25, w, hz * 0.25);
+    } else if (bd === 'volcano') {
+      c.fillStyle = th.skyline[0];
+      c.beginPath(); c.moveTo(w * 0.1, hz); c.lineTo(w * 0.42, hz * 0.25); c.lineTo(w * 0.58, hz * 0.25); c.lineTo(w * 0.9, hz); c.fill();
+      const glow = 0.6 + 0.4 * Math.sin(t * 2);
+      c.fillStyle = `rgba(255,${Math.round(90 + 60 * glow)},30,1)`;
+      c.beginPath(); c.moveTo(w * 0.44, hz * 0.26); c.lineTo(w * 0.56, hz * 0.26); c.lineTo(w * 0.53, hz * 0.55); c.lineTo(w * 0.49, hz * 0.4); c.lineTo(w * 0.46, hz * 0.6); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(80,60,70,.6)';
+      for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(w * (0.47 + i * 0.03), hz * (0.18 - i * 0.05) - (t * 8 % 10), hz * (0.06 + i * 0.02), 0, Math.PI * 2); c.fill(); }
     } else {
-      // Skyline with lit windows
       const bw = w / 9;
       for (let i = 0; i < 10; i++) {
         const bh = hz * (0.35 + ((i * 53) % 7) / 12);
@@ -283,12 +307,17 @@ const UI = (() => {
       c.beginPath(); c.moveTo(w / 2 - w0, y0); c.lineTo(w / 2 + w0, y0); c.lineTo(w / 2 + w1, y1); c.lineTo(w / 2 - w1, y1); c.fill();
     }
     drawZombie(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.2, shirt: '#4a3f7a' });
-    const ch2 = !!th.mesas;
+    const ch2 = selectedChapter > 0;
     walkers.forEach((z, i) => {
       const y = hz + (h - hz) * z.z * 0.55;
-      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: ['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff'][i % 4], seed: i * 1.37, helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
+      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: th.skin ? shadeHex(th.skin, (i % 3) * 0.08) : z.color, shirt: ['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff'][i % 4], seed: i * 1.37, helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
     });
-    if (ch2) { drawCactus(c, w * 0.1, h * 0.95, h * 0.26); drawDrum(c, w * 0.9, h * 0.97, h * 0.15); }
+    const bdp = th.backdrop || (th.mesas ? 'mesas' : 'city');
+    if (bdp === 'mesas') { drawCactus(c, w * 0.1, h * 0.95, h * 0.26); drawDrum(c, w * 0.9, h * 0.97, h * 0.15); }
+    else if (bdp === 'peaks') { drawPine(c, w * 0.1, h * 0.97, h * 0.4); drawSnowman(c, w * 0.9, h * 0.97, h * 0.2); }
+    else if (bdp === 'swamp') { drawDeadTree(c, w * 0.08, h * 0.97, h * 0.35); drawToxicBarrel(c, w * 0.9, h * 0.97, h * 0.16, t); }
+    else if (bdp === 'volcano') { drawLavaRock(c, w * 0.1, h * 0.97, h * 0.2, t); drawLavaRock(c, w * 0.9, h * 0.97, h * 0.16, t + 1); }
+    else if (selectedChapter > 0) { drawNeonLamp(c, w * 0.08, h * 0.97, h * 0.5, t, -1); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     else { drawCone(c, w * 0.1, h * 0.93, h * 0.13); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);
   }

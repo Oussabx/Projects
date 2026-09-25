@@ -737,6 +737,104 @@ function drawPickup(ctx, cx, cy, s, kind, t) {
   ctx.restore();
 }
 
+function drawPine(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 30);
+  rr(ctx, -h * 0.05, -h * 0.16, h * 0.1, h * 0.16, h * 0.02); blob(ctx, '#6b4a32', lw);
+  for (const [y, r] of [[0.14, 0.34], [0.38, 0.27], [0.6, 0.19]]) {
+    ctx.beginPath(); ctx.moveTo(-h * r, -h * y); ctx.lineTo(0, -h * (y + 0.4)); ctx.lineTo(h * r, -h * y); ctx.closePath();
+    blob(ctx, '#2f6a52', lw);
+    ctx.fillStyle = '#f5faff';
+    ctx.beginPath(); ctx.moveTo(-h * r * 0.5, -h * (y + 0.2)); ctx.lineTo(0, -h * (y + 0.4)); ctx.lineTo(h * r * 0.5, -h * (y + 0.2));
+    ctx.quadraticCurveTo(0, -h * (y + 0.16), -h * r * 0.5, -h * (y + 0.2)); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawSnowman(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 22);
+  ctx.beginPath(); ctx.arc(0, -h * 0.26, h * 0.26, 0, Math.PI * 2); blob(ctx, '#f7fbff', lw);
+  ctx.beginPath(); ctx.arc(0, -h * 0.68, h * 0.19, 0, Math.PI * 2); blob(ctx, '#f7fbff', lw);
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.arc(-h * 0.06, -h * 0.72, h * 0.025, 0, Math.PI * 2); ctx.arc(h * 0.06, -h * 0.72, h * 0.025, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ff8a1f';
+  ctx.beginPath(); ctx.moveTo(0, -h * 0.67); ctx.lineTo(h * 0.16, -h * 0.64); ctx.lineTo(0, -h * 0.62); ctx.fill();
+  rr(ctx, -h * 0.2, -h * 0.9, h * 0.4, h * 0.05, h * 0.02); blob(ctx, '#2b2342', lw);
+  rr(ctx, -h * 0.13, -h * 1.04, h * 0.26, h * 0.15, h * 0.03); blob(ctx, '#2b2342', lw);
+  ctx.fillStyle = '#e0303a'; ctx.fillRect(-h * 0.16, -h * 0.52, h * 0.32, h * 0.06);
+  ctx.restore();
+}
+
+function drawDeadTree(ctx, cx, footY, h) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  ctx.lineCap = 'round';
+  const branch = (x1, y1, x2, y2, w) => {
+    ctx.strokeStyle = INK; ctx.lineWidth = w + Math.max(2, h / 30);
+    ctx.beginPath(); ctx.moveTo(x1 * h, y1 * h); ctx.lineTo(x2 * h, y2 * h); ctx.stroke();
+    ctx.strokeStyle = '#4a3a2e'; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x1 * h, y1 * h); ctx.lineTo(x2 * h, y2 * h); ctx.stroke();
+  };
+  branch(0, 0, 0.02, -0.75, h * 0.09);
+  branch(0.01, -0.45, -0.28, -0.72, h * 0.045); branch(0.02, -0.6, 0.26, -0.85, h * 0.04);
+  branch(-0.18, -0.62, -0.26, -0.9, h * 0.025); branch(0.02, -0.75, -0.06, -1.0, h * 0.03);
+  ctx.fillStyle = 'rgba(160,220,90,.8)';
+  ctx.beginPath(); ctx.ellipse(-0.27 * h, -0.66 * h, h * 0.03, h * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawToxicBarrel(ctx, cx, footY, h, t = 0) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 16);
+  const w = h * 0.7;
+  ctx.fillStyle = 'rgba(160,255,60,.35)';
+  ctx.beginPath(); ctx.ellipse(w * 0.2, 0, w * 0.9, w * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  rr(ctx, -w / 2, -h, w, h, w * 0.1); blob(ctx, '#e0c21a', lw);
+  ctx.fillStyle = '#2b2342';
+  ctx.fillRect(-w / 2, -h * 0.72, w, h * 0.07); ctx.fillRect(-w / 2, -h * 0.32, w, h * 0.07);
+  ctx.beginPath(); ctx.arc(0, -h * 0.5, w * 0.16, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, -h, w / 2, w * 0.13, 0, 0, Math.PI * 2); blob(ctx, '#9ae03a', lw);
+  ctx.fillStyle = '#c8ff6a';
+  ctx.beginPath(); ctx.arc(w * 0.1, -h - Math.abs(Math.sin(t * 3)) * h * 0.12, w * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawLavaRock(ctx, cx, footY, h, t = 0) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 16);
+  ctx.fillStyle = 'rgba(255,110,30,.35)';
+  ctx.beginPath(); ctx.ellipse(0, 0, h * 0.9, h * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-h * 0.7, 0); ctx.lineTo(-h * 0.5, -h * 0.55); ctx.lineTo(-h * 0.1, -h * 0.85); ctx.lineTo(h * 0.35, -h * 0.7); ctx.lineTo(h * 0.7, 0);
+  ctx.closePath(); blob(ctx, '#3a2a30', lw);
+  const glow = 0.7 + 0.3 * Math.sin(t * 4 + cx);
+  ctx.strokeStyle = `rgba(255,${Math.round(120 + 80 * glow)},40,1)`; ctx.lineWidth = Math.max(1.5, h / 14); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-h * 0.3, -h * 0.1); ctx.lineTo(-h * 0.15, -h * 0.45); ctx.lineTo(h * 0.05, -h * 0.55);
+  ctx.moveTo(h * 0.2, -h * 0.15); ctx.lineTo(h * 0.3, -h * 0.4); ctx.stroke();
+  ctx.restore();
+}
+
+function drawNeonLamp(ctx, cx, footY, h, t = 0, side = 1) {
+  ctx.save();
+  ctx.translate(cx, footY);
+  const lw = Math.max(1.5, h / 30);
+  rr(ctx, -h * 0.03, -h, h * 0.06, h, h * 0.02); blob(ctx, '#2f2a5a', lw);
+  rr(ctx, -h * 0.03, -h, -side * h * 0.3, h * 0.05, h * 0.02); blob(ctx, '#2f2a5a', lw);
+  const lx = -side * h * 0.28;
+  const g = ctx.createRadialGradient(lx, -h * 0.92, 0, lx, -h * 0.92, h * 0.45);
+  g.addColorStop(0, 'rgba(255,95,208,.55)'); g.addColorStop(1, 'rgba(255,95,208,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(lx, -h * 0.92, h * 0.45, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(lx, -h * 0.93, h * 0.08, h * 0.04, 0, 0, Math.PI * 2); blob(ctx, '#ffd0f4', lw);
+  ctx.fillStyle = Math.sin(t * 3 + cx) > -0.9 ? '#2fe0ff' : '#1a8aa0';
+  ctx.fillRect(-h * 0.1, -h * 0.55, h * 0.2, h * 0.12);
+  ctx.restore();
+}
+
 function drawRock(ctx, cx, cy, r, t) {
   ctx.save();
   ctx.translate(cx, cy);

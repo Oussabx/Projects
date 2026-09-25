@@ -34,7 +34,7 @@ const WEAPONS = {
   rocket:  { name: 'Rocket Launcher', dmg: 3.6,  rate: 0.4,  minRarity: 2, trait: 'Rockets explode in an area',      color: '#4f8a3a', splash: 0.55 },
 };
 const RARITY_PREFIX = ['Rusty', 'Tactical', 'Elite', 'Golden', 'Mythic'];
-const GEAR_MAX_LVL = 10;
+const GEAR_MAX_LVL = 25;
 const gearUpgradeCost = item => Math.round(80 * (item.rarity + 1) * Math.pow(item.lvl || 1, 1.45));
 const FREE_CHEST_MS = 4 * 60 * 60 * 1000;
 
@@ -44,8 +44,8 @@ const SKILLS = [
   { id: 'rate', name: 'Trigger Finger', desc: 'Fire speed',  per: 0.06,  fmt: l => `+${Math.round(l * 6)}% fire speed` },
   { id: 'crit', name: 'Sharpshooter',   desc: 'Crit chance', per: 0.015, fmt: l => `+${(l * 1.5).toFixed(1)}% crit` },
 ];
-const SKILL_MAX = 20;
-const skillCost = lvl => Math.round(120 * Math.pow(1.38, lvl));
+const SKILL_MAX = 50;
+const skillCost = lvl => Math.round(120 + 60 * Math.pow(lvl, 1.85));
 
 // Drop odds per rarity (common..mythic), in percent.
 const CHESTS = [
@@ -102,7 +102,7 @@ const CHAPTERS = [
       ground: ['#f0b35a', '#f7c472'], shoulder: '#d9925a', road: '#6a4f63',
       curb: ['#ffd23a', '#2b2342'], line: '#ffffff',
       skyline: ['#b8502f', '#d0673a'], windows: null, menuGround: ['#e8a55a', '#c9803f'],
-      mesas: true,
+      mesas: true, backdrop: 'mesas',
       props: ['cactus', 'cactus', 'rock', 'tires', 'drum', 'car', 'cone'],
     },
     levels: [
@@ -118,6 +118,138 @@ const CHAPTERS = [
         boss: { name: 'Dune Stalker', hp: 37800, dmg: 64, color: '#e08a4a', size: 1.8 } },
       { name: 'Warlord Fort',    length: 320, zhp: 183, zdmg: 45, density: 1.65, power: 30000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
         boss: { name: 'The Warlord',  hp: 47600, dmg: 70, color: '#9a5fd6', size: 2.1, final: true } },
+    ],
+  },
+  {
+    id: 'ch3',
+    name: 'Frozen Peaks',
+    theme: {
+      sky: ['#5f98d8', '#a9d2ff', '#eef7ff'],
+      sun: 'rgba(255,255,255,.95)',
+      ground: ['#e6f0fb', '#f5f9ff'],
+      shoulder: '#b9cde6',
+      road: '#7a88a6',
+      curb: ['#3aa0ff', '#ffffff'],
+      line: '#ffe36e',
+      skyline: ['#9fb8d8', '#bcd0ea'],
+      windows: null,
+      menuGround: ['#dde9f7', '#b9cde6'],
+      backdrop: 'peaks',
+      skin: '#8fd0e0',
+      props: ['pine', 'pine', 'snowman', 'pine', 'crate'],
+    },
+    levels: [
+      { name: 'Snowy Outpost', length: 270, zhp: 231, zdmg: 40, density: 1.6, power: 40000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Yeti Brute', hp: 43700, dmg: 57, color: '#bfe6f2', size: 1.65 } },
+      { name: 'Frozen Lake', length: 282, zhp: 248, zdmg: 42, density: 1.62, power: 43000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Frostbite', hp: 49100, dmg: 61, color: '#8fd0e0', size: 1.7 } },
+      { name: 'Ice Cave', length: 294, zhp: 268, zdmg: 45, density: 1.64, power: 47000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Ice Maw', hp: 57300, dmg: 66, color: '#7ac0e8', size: 1.75 } },
+      { name: 'Avalanche Road', length: 306, zhp: 290, zdmg: 47, density: 1.66, power: 50000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Snow Hulk', hp: 65500, dmg: 71, color: '#d6eef7', size: 1.8 } },
+      { name: 'Blizzard Base', length: 318, zhp: 317, zdmg: 50, density: 1.68, power: 54000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Blizzard King', hp: 73700, dmg: 76, color: '#6fb0e0', size: 1.85 } },
+      { name: 'Glacier Throne', length: 330, zhp: 344, zdmg: 53, density: 1.7, power: 59000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'The Frost Titan', hp: 92800, dmg: 83, color: '#5fa0e8', size: 2.15, final: true } },
+    ],
+  },
+  {
+    id: 'ch4',
+    name: 'Toxic Swamp',
+    theme: {
+      sky: ['#1f3a2e', '#5f8a3a', '#c9e06a'],
+      sun: 'rgba(220,255,140,.85)',
+      ground: ['#3f5a2a', '#4d6b32'],
+      shoulder: '#6b5a3a',
+      road: '#4a3f46',
+      curb: ['#9ad13b', '#2b2342'],
+      line: '#c9ff5a',
+      skyline: ['#233a26', '#2e4a2e'],
+      windows: null,
+      menuGround: ['#4a6a30', '#33502a'],
+      backdrop: 'swamp',
+      skin: '#a6e040',
+      props: ['deadtree', 'toxic', 'deadtree', 'tires', 'toxic'],
+    },
+    levels: [
+      { name: 'Murky Dock', length: 270, zhp: 440, zdmg: 47, density: 1.65, power: 63000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Bog Crawler', hp: 85700, dmg: 67, color: '#8fbf3a', size: 1.65 } },
+      { name: 'Rotten Marsh', length: 282, zhp: 473, zdmg: 50, density: 1.67, power: 68000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Sludge Belly', hp: 96400, dmg: 72, color: '#a6d13b', size: 1.7 } },
+      { name: 'Sludge Plant', length: 294, zhp: 508, zdmg: 53, density: 1.69, power: 74000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Swamp Hag', hp: 112500, dmg: 78, color: '#7fae4a', size: 1.75 } },
+      { name: 'Bayou Bridge', length: 306, zhp: 551, zdmg: 56, density: 1.71, power: 80000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Mutant Brute', hp: 128500, dmg: 84, color: '#b8e03a', size: 1.8 } },
+      { name: 'Mutant Lab', length: 318, zhp: 600, zdmg: 58, density: 1.73, power: 86000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Dr. Rot', hp: 144500, dmg: 89, color: '#6f9e3a', size: 1.85 } },
+      { name: 'Plague Heart', length: 330, zhp: 654, zdmg: 63, density: 1.75, power: 93000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'The Plague Lord', hp: 182100, dmg: 97, color: '#9ad13b', size: 2.15, final: true } },
+    ],
+  },
+  {
+    id: 'ch5',
+    name: 'Volcano Ridge',
+    theme: {
+      sky: ['#1f0a18', '#7a2230', '#ff7a2a'],
+      sun: 'rgba(255,200,120,.9)',
+      ground: ['#2e1a1a', '#ff5a1a'],
+      shoulder: '#4a3030',
+      road: '#3a2f38',
+      curb: ['#ff8a1f', '#2b2342'],
+      line: '#ffd23a',
+      skyline: ['#3a1a1a', '#4a2222'],
+      windows: null,
+      menuGround: ['#4a2a2a', '#2e1a1a'],
+      backdrop: 'volcano',
+      skin: '#b88a7a',
+      props: ['lavarock', 'lavarock', 'drum', 'tires', 'lavarock'],
+    },
+    levels: [
+      { name: 'Ash Fields', length: 270, zhp: 862, zdmg: 56, density: 1.7, power: 100000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Ember Brute', hp: 173900, dmg: 79, color: '#c9805a', size: 1.65 } },
+      { name: 'Magma Pass', length: 282, zhp: 925, zdmg: 59, density: 1.72, power: 108000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Magma Maw', hp: 195500, dmg: 85, color: '#d9703a', size: 1.7 } },
+      { name: 'Obsidian Mine', length: 294, zhp: 996, zdmg: 62, density: 1.74, power: 117000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Obsidian Golem', hp: 228200, dmg: 92, color: '#6a5a6a', size: 1.75 } },
+      { name: 'Fire Temple', length: 306, zhp: 1079, zdmg: 66, density: 1.76, power: 126000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Fire Priest', hp: 260800, dmg: 99, color: '#e08a4a', size: 1.8 } },
+      { name: 'Molten Core', length: 318, zhp: 1178, zdmg: 69, density: 1.78, power: 136000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Lava Behemoth', hp: 293500, dmg: 105, color: '#c95a3a', size: 1.85 } },
+      { name: 'Crater Throne', length: 330, zhp: 1283, zdmg: 74, density: 1.8, power: 147000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'The Inferno Emperor', hp: 369400, dmg: 115, color: '#ff6a3a', size: 2.15, final: true } },
+    ],
+  },
+  {
+    id: 'ch6',
+    name: 'Neon Capital',
+    theme: {
+      sky: ['#0b0a2a', '#2a1a5a', '#7a2a9a'],
+      sun: 'rgba(255,120,230,.8)',
+      ground: ['#1a1840', '#221f50'],
+      shoulder: '#3a3570',
+      road: '#26234a',
+      curb: ['#ff3dce', '#2fe0ff'],
+      line: '#2fe0ff',
+      skyline: ['#1a1640', '#231d58'],
+      windows: '#ff5fd0',
+      menuGround: ['#2a2660', '#1a1840'],
+      backdrop: 'city',
+      skin: '#b48ae0',
+      props: ['lamp', 'car', 'lamp', 'cone', 'hydrant'],
+    },
+    levels: [
+      { name: 'Downtown', length: 270, zhp: 1632, zdmg: 66, density: 1.75, power: 159000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Neon Brute', hp: 340200, dmg: 93, color: '#c08ae8', size: 1.65 } },
+      { name: 'Neon Strip', length: 282, zhp: 1752, zdmg: 70, density: 1.77, power: 172000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Glitch', hp: 382800, dmg: 101, color: '#8ae0e8', size: 1.7 } },
+      { name: 'Metro Station', length: 294, zhp: 1884, zdmg: 74, density: 1.79, power: 185000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Subway Terror', hp: 446400, dmg: 109, color: '#a07ad8', size: 1.75 } },
+      { name: 'Skyscraper Row', length: 306, zhp: 2043, zdmg: 78, density: 1.8, power: 200000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Skyline Ripper', hp: 510300, dmg: 116, color: '#d08ae0', size: 1.8 } },
+      { name: 'Tower Plaza', length: 318, zhp: 2229, zdmg: 81, density: 1.8, power: 216000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'Royal Guard', hp: 574200, dmg: 124, color: '#9a6ae0', size: 1.85 } },
+      { name: 'Zombie Capitol', length: 330, zhp: 2427, zdmg: 87, density: 1.8, power: 233000, types: ['walker', 'runner', 'armored', 'bomber', 'tank'],
+        boss: { name: 'The Zombie King', hp: 723000, dmg: 136, color: '#e05fd0', size: 2.15, final: true } },
     ],
   },
 ];

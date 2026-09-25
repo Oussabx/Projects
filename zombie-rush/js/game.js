@@ -165,10 +165,12 @@ const Game = (() => {
     if (!run.theme.props.length) return;
     const side = Math.random() < 0.5 ? -1 : 1;
     const kind = pick(run.theme.props);
-    const far = kind === 'car' || kind === 'bush' || kind === 'cactus' || kind === 'rock';
+    const far = ['car', 'bush', 'cactus', 'rock', 'pine', 'deadtree', 'lavarock', 'snowman'].includes(kind);
+    const H = { car: [0.32, 0.4], bush: [0.3, 0.45], rock: [0.3, 0.45], cactus: [0.45, 0.65], pine: [0.7, 1.0],
+      deadtree: [0.6, 0.85], snowman: [0.32, 0.4], lavarock: [0.3, 0.45], toxic: [0.24, 0.3], lamp: [0.8, 0.9] }[kind] || [0.22, 0.32];
     run.props.push({
-      x: side * (far ? rand(2.05, 2.6) : rand(1.3, 1.8)), z, kind,
-      h: kind === 'car' ? rand(0.32, 0.4) : kind === 'bush' || kind === 'rock' ? rand(0.3, 0.45) : kind === 'cactus' ? rand(0.45, 0.65) : rand(0.22, 0.32),
+      x: side * (far ? rand(2.05, 2.7) : kind === 'lamp' ? 1.3 : rand(1.3, 1.8)), z, kind, side,
+      h: rand(H[0], H[1]),
       color: pick(['#ff4d5e', '#29a8ff', '#ffc933', '#a55cff', '#4fd645', '#ff8a1f']),
     });
   }
@@ -181,13 +183,20 @@ const Game = (() => {
     return 'walker';
   }
 
+  // Each chapter tints its zombies (icy, toxic, charred, neon...).
+  const SKIN_SHIFT = { walker: 0, runner: 0.14, tank: -0.2, armored: 0.07, bomber: 0.2 };
+  function zombieSkin(type, zt) {
+    const base = run.theme.skin;
+    return base ? shadeHex(base, SKIN_SHIFT[type] || 0) : zt.color;
+  }
+
   function spawnZombie(x, z, type, gid = 0) {
     const zt = ZOMBIE_TYPES[type];
     const hp = Math.round(run.cfg.zhp * zt.hpMult);
     run.zombies.push({
       gid, acc: 0, accT: 0, seed: Math.random() * 10,
       type, x, z, hp, maxHp: hp, speed: zt.speed * 1.6 * rand(0.85, 1.15), size: zt.size,
-      color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
+      color: zombieSkin(type, zt), score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
     });
   }
@@ -195,7 +204,7 @@ const Game = (() => {
   function spawnGroup(z) {
     const cfg = run.cfg;
     const early = Math.max(0, 3 - run.gl) / 3;   // 1 on level 1, fades to 0 by level 4
-    const count = Math.round((8 + Math.random() * 7) * cfg.density * (1 - early * 0.35) + run.gl * 1.2);
+    const count = Math.min(34, Math.round((8 + Math.random() * 7) * cfg.density * (1 - early * 0.35) + Math.min(run.gl, 12) * 1.2));
     const cx = rand(-0.45, 0.45);
     const gid = run.nextGid++;
     run.groups[gid] = { total: count, alive: count };
@@ -742,7 +751,9 @@ const Game = (() => {
     ctx.fillRect(0, far, W, H - far);
     const gOff = r.dist % 4;
     for (let z = -gOff - 4; z < Z_FAR; z += 4) {
+      if (th.backdrop === 'volcano') ctx.globalAlpha = 0.75 + 0.25 * Math.sin(r.t * 3 + z);
       quad(-12, Math.max(z, zNear), 12, Math.max(z + 2, zNear), th.ground[1]);
+      ctx.globalAlpha = 1;
     }
 
     // Sidewalks with tiles
@@ -1121,6 +1132,12 @@ const Game = (() => {
     else if (p.kind === 'cactus') drawCactus(ctx, q.x, q.y, h);
     else if (p.kind === 'rock') drawDesertRock(ctx, q.x, q.y, h);
     else if (p.kind === 'drum') drawDrum(ctx, q.x, q.y, h);
+    else if (p.kind === 'pine') drawPine(ctx, q.x, q.y, h);
+    else if (p.kind === 'snowman') drawSnowman(ctx, q.x, q.y, h);
+    else if (p.kind === 'deadtree') drawDeadTree(ctx, q.x, q.y, h);
+    else if (p.kind === 'toxic') drawToxicBarrel(ctx, q.x, q.y, h, run.t);
+    else if (p.kind === 'lavarock') drawLavaRock(ctx, q.x, q.y, h, run.t);
+    else if (p.kind === 'lamp') drawNeonLamp(ctx, q.x, q.y, h, run.t, p.side);
     else drawTires(ctx, q.x, q.y, h);
   }
 
