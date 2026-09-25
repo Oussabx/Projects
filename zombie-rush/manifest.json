@@ -1,0 +1,10 @@
+{
+  "name": "Zombie Rush",
+  "short_name": "Zombie Rush",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2e323c",
+  "theme_color": "#2e323c",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
