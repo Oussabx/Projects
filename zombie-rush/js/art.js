@@ -448,7 +448,7 @@ function drawBarrel(ctx, cx, footY, w, h, hp) {
   ctx.restore();
 }
 
-function drawGate(ctx, x1, x2, footY, h, label, good) {
+function drawGate(ctx, x1, x2, footY, h, label, good, hp) {
   ctx.save();
   const w = x2 - x1;
   const top = footY - h;
@@ -458,6 +458,24 @@ function drawGate(ctx, x1, x2, footY, h, label, good) {
   rr(ctx, x1, top, w, h, Math.min(10, w * 0.08));
   ctx.fillStyle = grad; ctx.fill();
   ctx.lineWidth = Math.max(2, w / 45); ctx.strokeStyle = good ? '#bfe3ff' : '#ffd0d0'; ctx.stroke();
+  if (hp) {
+    // Shootable sign: damage drains a bright fill from the top, with an HP pill below the label.
+    const lost = 1 - Math.max(0, hp.frac);
+    ctx.save();
+    rr(ctx, x1, top, w, h, Math.min(10, w * 0.08)); ctx.clip();
+    ctx.fillStyle = 'rgba(10,20,60,.45)';
+    ctx.fillRect(x1, top, w, h * lost);
+    if (hp.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${hp.flash * 4})`; ctx.fillRect(x1, top, w, h); }
+    ctx.restore();
+    const ps = Math.max(7, h * 0.2);
+    ctx.font = `900 ${Math.round(ps)}px "Lilita One", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const txt = hp.text, pw = ctx.measureText(txt).width + ps;
+    ctx.fillStyle = 'rgba(20,19,43,.8)';
+    rr(ctx, x1 + w / 2 - pw / 2, top + h * 0.72, pw, ps * 1.3, ps * 0.6); ctx.fill();
+    ctx.fillStyle = '#ffe36e';
+    ctx.fillText(txt, x1 + w / 2, top + h * 0.72 + ps * 0.68);
+  }
   ctx.fillStyle = '#fff';
   ctx.strokeStyle = INK;
   let fs = Math.max(8, h * 0.32);
@@ -470,8 +488,9 @@ function drawGate(ctx, x1, x2, footY, h, label, good) {
   ctx.lineWidth = Math.max(2, fs / 5);
   ctx.lineJoin = 'round';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.strokeText(label, x1 + w / 2, top + h * 0.5);
-  ctx.fillText(label, x1 + w / 2, top + h * 0.5);
+  const ly = top + h * (hp ? 0.4 : 0.5);
+  ctx.strokeText(label, x1 + w / 2, ly);
+  ctx.fillText(label, x1 + w / 2, ly);
   ctx.restore();
 }
 

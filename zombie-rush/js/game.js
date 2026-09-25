@@ -102,7 +102,7 @@ const Game = (() => {
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
-      weapon: equippedWeapon(), leaderCd: 0.2,
+      weapon: equippedWeapon(), leaderCd: 0.2, trickle: 3,
       squad: 6 + Math.max(0, 3 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
@@ -204,7 +204,7 @@ const Game = (() => {
   function spawnGroup(z) {
     const cfg = run.cfg;
     const early = Math.max(0, 3 - run.gl) / 3;   // 1 on level 1, fades to 0 by level 4
-    const count = Math.min(34, Math.round((8 + Math.random() * 7) * cfg.density * (1 - early * 0.35) + Math.min(run.gl, 12) * 1.2));
+    const count = Math.min(40, Math.round((10 + Math.random() * 8) * cfg.density * (1 - early * 0.35) + Math.min(run.gl, 12) * 1.2));
     const cx = rand(-0.45, 0.45);
     const gid = run.nextGid++;
     run.groups[gid] = { total: count, alive: count };
@@ -256,7 +256,8 @@ const Game = (() => {
     let b = gateOption(Math.random() < (run.gl < 2 ? 0.25 : 0.45));
     if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
-    run.gates.push({ z, sides: [{ side: -1, ...sides[0] }, { side: 1, ...sides[1] }] });
+    const hpFor = o => o.val >= 0 ? Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5 : 0;
+    run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
   }
 
   function gateLabel(g) {
@@ -323,7 +324,14 @@ const Game = (() => {
         if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(15, 20); }
         else if (Math.random() < 0.42 + Math.max(0, 3 - r.gl) * 0.05) spawnBarrel(z);
         else spawnGroup(z);
-        r.nextSpawn += rand(4.5, 7) / r.cfg.density;
+        r.nextSpawn += rand(3.3, 5.2) / r.cfg.density;
+      }
+      // Stragglers keep walking in between the big crowds.
+      r.trickle -= dt;
+      if (r.trickle <= 0) {
+        const n = 1 + Math.floor(Math.random() * (r.gl < 2 ? 2 : 3));
+        for (let i = 0; i < n; i++) spawnZombie(rand(-0.85, 0.85), Z_FAR - rand(1, 4), zombieType());
+        r.trickle = rand(1.1, 2) / r.cfg.density * (r.gl < 2 ? 1.6 : 1);
       }
     } else if (!r.boss) {
       spawnBoss();
@@ -453,6 +461,19 @@ const Game = (() => {
       b.z += (b.sp || BULLET_SPEED) * dt;
       b.x += b.vx * dt;
       let hit = false;
+
+      // Blue signs are shootable: bullets crossing a sign's plane chip its HP; breaking it grants the power-up.
+      for (const gt of r.gates) {
+        if (b.rocket ? !(b.z >= gt.z && prevZ < gt.z + 0.4) : !(prevZ < gt.z && b.z >= gt.z)) continue;
+        const sd = gt.sides.find(sd => sd.side === (b.x < 0 ? -1 : 1));
+        if (!sd || sd.broken || sd.val < 0 || Math.abs(b.x) > 0.97) continue;
+        const { dmg } = bulletDamage(b.rocket ? b.m * 2 : b.m);
+        sd.hp -= dmg; sd.flash = 0.06;
+        Sound.play('hit');
+        if (sd.hp <= 0) breakGate(gt, sd);
+        hit = true;
+        break;
+      }
 
       if (!hit) {
         let target = null, bestZ = Infinity;
@@ -632,12 +653,29 @@ const Game = (() => {
     for (let i = r.gates.length - 1; i >= 0; i--) {
       const g = r.gates[i];
       g.z -= move;
+      for (const sd of g.sides) sd.flash = Math.max(0, sd.flash - 1 / 60);
       if (g.z <= 0.2) {
+        // Walking into a red sign still costs you; blue ones only pay out when shot to pieces.
         const s = g.sides.find(s => s.side === (r.x < 0 ? -1 : 1));
-        applyGate(s);
+        if (s.val < 0) applyGate(s);
         r.gates.splice(i, 1);
+      } else if (g.sides.every(sd => sd.broken || sd.val < 0) && g.sides.some(sd => sd.broken)) {
+        if (g.sides.every(sd => sd.broken)) r.gates.splice(i, 1);
       }
     }
+  }
+
+  function breakGate(gt, sd) {
+    const r = run;
+    sd.broken = true;
+    const x = sd.side * 0.5;
+    const p = proj(x, gt.z);
+    for (let k = 0; k < 18; k++) {
+      const a = rand(-Math.PI, 0), sp = rand(140, 360) * (0.5 + p.s * 0.5);
+      r.fx.push({ type: 'plank', sx: p.x + rand(-30, 30) * p.s, sy: p.y - 0.25 * roadW * p.s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, rot: rand(0, 6), vr: rand(-12, 12),
+        w: rand(8, 16) * (0.4 + p.s * 0.6), h: rand(6, 10) * (0.4 + p.s * 0.6), color: pick(['#7cc4ff', '#bfe3ff', '#3a8ff0']), t: 0.7, max: 0.7 });
+    }
+    applyGate(sd);
   }
 
   function applyGate(g) {
@@ -1147,7 +1185,8 @@ const Game = (() => {
       const a = proj(Math.min(inner, outer), g.z), b = proj(Math.max(inner, outer), g.z);
       const h = 0.5 * roadW * a.s;
       const good = s.val >= 0;
-      drawGate(ctx, a.x, b.x, a.y, h, gateLabel(s), good);
+      if (s.broken) continue;
+      drawGate(ctx, a.x, b.x, a.y, h, gateLabel(s), good, good ? { frac: s.hp / s.maxHp, text: fmtN(Math.max(0, Math.ceil(s.hp))), flash: s.flash } : null);
     }
   }
 
