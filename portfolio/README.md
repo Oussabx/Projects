@@ -21,7 +21,6 @@ python3 -m http.server 8000 -d portfolio
 
 Replace these placeholders:
 
-- **Your Name / YN** — `index.html` (title, meta, header, about, footer), `assets/favicon.svg`, `assets/og-image.svg`
 - **you@example.com** — `index.html` (contact section) and `script.js` (contact form `mailto:`)
 - **Your City**, bio text, skills — `index.html` `#about`
 - **Social links** — `index.html` `.socials` (LinkedIn, Dribbble, Behance point to the homepages)
