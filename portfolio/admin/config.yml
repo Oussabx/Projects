@@ -1,0 +1,125 @@
+# Decap CMS — edits the JSON files in portfolio/content and commits them to GitHub.
+# Vercel redeploys automatically after each save.
+backend:
+  name: github
+  repo: oussabx/projects
+  branch: main
+  # base_url / auth_endpoint are set in admin/index.html
+
+# Lets you edit locally without GitHub: run `npx decap-server` from the repo root.
+local_backend: true
+
+site_url: /
+display_url: /
+logo_url: /assets/favicon.svg
+
+media_folder: portfolio/assets/uploads
+public_folder: assets/uploads
+
+collections:
+  - name: work
+    label: Projects
+    editor: { preview: false }
+    files:
+      - name: projects
+        label: Projects
+        file: portfolio/content/projects.json
+        fields:
+          - label: Projects
+            name: projects
+            label_singular: Project
+            widget: list
+            summary: "{{fields.title}}"
+            hint: Drag to reorder. The order here is the order on the site.
+            fields:
+              - { label: Title, name: title, widget: string }
+              - { label: Visible on site, name: visible, widget: boolean, default: true }
+              - { label: Role, name: role, widget: string, required: false, hint: "e.g. UX research · UI design" }
+              - { label: Summary, name: summary, widget: text }
+              - label: Categories
+                name: categories
+                widget: select
+                multiple: true
+                min: 1
+                options:
+                  - { label: UI/UX, value: uiux }
+                  - { label: Development, value: dev }
+              - { label: Tags, name: tags, widget: list, required: false, hint: "Comma-separated, e.g. Figma, React" }
+              - { label: Image, name: image, widget: image, required: false, hint: "Screenshot, ideally 800×520" }
+              - label: Links
+                name: links
+                label_singular: Link
+                widget: list
+                required: false
+                summary: "{{fields.label}}"
+                fields:
+                  - { label: Label, name: label, widget: string, hint: "e.g. Live site, Case study, Source" }
+                  - { label: URL, name: href, widget: string }
+
+  - name: settings
+    label: Site content
+    editor: { preview: false }
+    files:
+      - name: site
+        label: Hero, About & Contact
+        file: portfolio/content/site.json
+        fields:
+          - { label: Name, name: name, widget: string }
+          - { label: Initials (logo), name: initials, widget: string, hint: "1–2 letters" }
+          - { label: Job title, name: title, widget: string }
+          - label: Hero
+            name: hero
+            widget: object
+            collapsed: false
+            fields:
+              - { label: Show availability badge, name: showAvailability, widget: boolean, default: true }
+              - { label: Availability text, name: availability, widget: string }
+              - { label: Headline, name: headline, widget: text, hint: "Wrap a word in *asterisks* to highlight it" }
+              - { label: Intro, name: lead, widget: text }
+              - label: Stats
+                name: stats
+                label_singular: Stat
+                widget: list
+                summary: "{{fields.value}} — {{fields.label}}"
+                fields:
+                  - { label: Value, name: value, widget: string }
+                  - { label: Label, name: label, widget: string }
+          - label: About
+            name: about
+            widget: object
+            fields:
+              - { label: Heading, name: heading, widget: string }
+              - { label: Photo, name: photo, widget: image, required: false, hint: "Leave empty to show your initials" }
+              - label: Paragraphs
+                name: paragraphs
+                label_singular: Paragraph
+                widget: list
+                field: { label: Paragraph, name: paragraph, widget: text }
+              - label: Skill groups
+                name: skillGroups
+                label_singular: Skill group
+                widget: list
+                summary: "{{fields.name}}"
+                fields:
+                  - { label: Group name, name: name, widget: string }
+                  - { label: Skills, name: skills, widget: list, hint: "Comma-separated" }
+          - label: Contact
+            name: contact
+            widget: object
+            fields:
+              - { label: Heading, name: heading, widget: string }
+              - { label: Text, name: text, widget: text }
+              - { label: Email, name: email, widget: string }
+              - label: Contact form endpoint
+                name: formEndpoint
+                widget: string
+                required: false
+                hint: "Formspree URL like https://formspree.io/f/abcdwxyz. Messages then show up under 'Contact messages'. Leave empty to open the visitor's email app instead."
+              - label: Social links
+                name: socials
+                label_singular: Link
+                widget: list
+                summary: "{{fields.label}}"
+                fields:
+                  - { label: Label, name: label, widget: string }
+                  - { label: URL, name: url, widget: string }
