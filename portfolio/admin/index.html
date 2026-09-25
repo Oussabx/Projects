@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>Portfolio Admin</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+<link rel="cms-config-url" type="text/yaml" href="/admin/config.yml" />
+<style>
+  .messages-link {
+    position: fixed; right: 16px; bottom: 16px; z-index: 1000;
+    padding: 10px 16px; border-radius: 999px;
+    background: #5b4bff; color: #fff; font: 600 14px/1 system-ui, sans-serif;
+    text-decoration: none; box-shadow: 0 8px 24px -8px rgba(0,0,0,.4);
+  }
+  .messages-link:hover { background: #4a3be6; }
+</style>
+</head>
+<body>
+<!-- Contact-form messages live in the form service (Formspree), not in the repo. -->
+<a class="messages-link" href="https://formspree.io/forms" target="_blank" rel="noopener">Contact messages ↗</a>
+<script>window.CMS_MANUAL_INIT = true;</script>
+<script src="https://cdn.jsdelivr.net/npm/decap-cms@3.3.3/dist/decap-cms.js"></script>
+<script>
+  // Log in through this site's own /api/auth (see api/auth.js), wherever it is deployed.
+  CMS.init({ config: { backend: { base_url: window.location.origin, auth_endpoint: 'api/auth' } } });
+</script>
+</body>
+</html>
