@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Your Name — UI/UX Designer & Front-End Developer</title>
+<meta name="description" content="Portfolio of Your Name: UI/UX design and front-end development — research-led interfaces, design systems and fast, accessible websites." />
+<meta property="og:title" content="Your Name — UI/UX Designer & Front-End Developer" />
+<meta property="og:description" content="Research-led interfaces, design systems and fast, accessible websites." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="assets/og-image.svg" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script>
+  // Apply saved theme before paint to avoid a flash.
+  try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" id="header">
+  <div class="container header-inner">
+    <a href="#top" class="brand" aria-label="Home">
+      <span class="brand-mark" aria-hidden="true">YN</span>
+      <span class="brand-text">Your Name</span>
+    </a>
+    <nav class="nav" id="nav" aria-label="Primary">
+      <a href="#about">About</a>
+      <a href="#work">Work</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode">
+        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      </button>
+      <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="container hero-inner">
+      <p class="eyebrow reveal"><span class="status-dot" aria-hidden="true"></span> Available for freelance &amp; full-time roles</p>
+      <h1 class="hero-title reveal">
+        I design interfaces people <em>enjoy</em> using — and build them, too.
+      </h1>
+      <p class="hero-lead reveal">
+        UI/UX designer &amp; front-end developer turning research and rough ideas into clear,
+        accessible, fast products. From first sketch in Figma to production code.
+      </p>
+      <div class="hero-cta reveal">
+        <a class="btn btn-primary" href="#work">View my work
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn btn-ghost" href="#contact">Get in touch</a>
+      </div>
+      <ul class="hero-stats reveal" aria-label="Highlights">
+        <li><strong>5+</strong><span>Shipped projects</span></li>
+        <li><strong>Design → Code</strong><span>End-to-end ownership</span></li>
+        <li><strong>100</strong><span>Lighthouse accessibility</span></li>
+      </ul>
+    </div>
+    <div class="hero-grid" aria-hidden="true"></div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section" id="about">
+    <div class="container about">
+      <div class="about-media reveal">
+        <div class="avatar" role="img" aria-label="Portrait placeholder">
+          <span>YN</span>
+        </div>
+      </div>
+      <div class="about-body">
+        <p class="section-kicker reveal">About</p>
+        <h2 class="section-title reveal">Designer by training, developer by curiosity.</h2>
+        <p class="reveal">
+          I'm Your Name, a UI/UX designer and front-end developer based in Your City. I care about
+          the whole journey: understanding users, mapping flows, crafting pixel-level UI, and
+          shipping it as clean, responsive code.
+        </p>
+        <p class="reveal">
+          My process is simple — listen, prototype early, test with real people, and iterate until
+          the interface feels obvious.
+        </p>
+
+        <div class="skills reveal">
+          <div class="skill-group">
+            <h3>Design</h3>
+            <ul class="chips">
+              <li>Figma</li><li>User research</li><li>Wireframing</li><li>Prototyping</li>
+              <li>Design systems</li><li>Usability testing</li>
+            </ul>
+          </div>
+          <div class="skill-group">
+            <h3>Development</h3>
+            <ul class="chips">
+              <li>HTML</li><li>CSS</li><li>JavaScript</li><li>React</li>
+              <li>Responsive design</li><li>Accessibility</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORK -->
+  <section class="section section-alt" id="work">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <p class="section-kicker reveal">Selected work</p>
+          <h2 class="section-title reveal">Projects</h2>
+        </div>
+        <div class="filters reveal" role="group" aria-label="Filter projects">
+          <button class="filter is-active" data-filter="all" aria-pressed="true">All</button>
+          <button class="filter" data-filter="uiux" aria-pressed="false">UI/UX</button>
+          <button class="filter" data-filter="dev" aria-pressed="false">Development</button>
+        </div>
+      </div>
+      <div class="projects" id="projects" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section class="section" id="contact">
+    <div class="container contact">
+      <div class="contact-intro">
+        <p class="section-kicker reveal">Contact</p>
+        <h2 class="section-title reveal">Let's build something great together.</h2>
+        <p class="reveal">Have a project, a role, or just a question? My inbox is always open — I usually reply within a day.</p>
+        <a class="contact-email reveal" href="mailto:you@example.com">you@example.com</a>
+        <ul class="socials reveal">
+          <li><a href="https://github.com/oussabx" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://www.linkedin.com/" target="_blank" rel="noopener">LinkedIn</a></li>
+          <li><a href="https://dribbble.com/" target="_blank" rel="noopener">Dribbble</a></li>
+          <li><a href="https://www.behance.net/" target="_blank" rel="noopener">Behance</a></li>
+        </ul>
+      </div>
+
+      <form class="contact-form reveal" id="contactForm" novalidate>
+        <div class="field">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" autocomplete="name" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="5" required></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit">Send message</button>
+        <p class="form-note" id="formNote" role="status"></p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <p>© <span id="year"></span> Your Name. Designed &amp; built by me.</p>
+    <a href="#top">Back to top ↑</a>
+  </div>
+</footer>
+
+<script src="projects.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
