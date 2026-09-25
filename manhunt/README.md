@@ -2,12 +2,12 @@
 
 **Run / Drive / Hide / Hunt.** A real-world chase game for iOS and Android. Two teams play in the same city: **runners** on foot and **hunters** in a car. Runners get a 5-minute head start. After that, the hunters get a location pin for each runner. It's the runner's position at that moment, not a live location. New pins keep dropping on a timer until the hunters catch every runner or time runs out.
 
-![Home, lobby and get-ready screens](docs/screens-1.png)
+![Sign up, home, lobby and get-ready screens](docs/screens-1.png)
 ![Runner view, hunter view with pins, and results](docs/screens-2.png)
 
 ## How a game works
 
-1. **Everyone installs the app** and turns on location.
+1. **Everyone installs the app, creates an account** (username, email and password) and turns on location. Your username is the name other players see in lobbies, on the map and on the results screen.
 2. **One player creates a lobby.** They get a 5-character code (e.g. `7X9KQ`) and share it with the invite button.
 3. **Everyone else joins** with the code. The lobby holds 2–6 players, so it can be **1 vs 1** up to **3 vs 3**. With an odd number, runners get the extra player (e.g. 2 vs 3).
 4. **The host taps Start Game.** The app **randomly assigns hunters and runners**, then shows everyone a 10-second "Get Ready" countdown with their role.
@@ -31,7 +31,7 @@ The host can change these in the lobby (gear icon): head start (3/5/10 min), hun
 
 - [Expo](https://expo.dev) SDK 57 / React Native (JavaScript)
 - `expo-location` for GPS, `react-native-maps` for the dark map
-- Firebase: anonymous auth plus Firestore for the live lobby and pins. No custom server.
+- Firebase: email/password accounts with a public username, plus Firestore for the live lobby and pins. No custom server.
 - Fonts: Anton (headlines) and Inter (UI), in the moodboard palette: orange `#FF4B2B`, black, graphite, olive, sand and off-white.
 
 ```
@@ -39,8 +39,8 @@ App.js                 fonts, auth, and a router driven by the lobby's status
 src/game/logic.js      pure rules: phases, pin rounds, role assignment, win check
 src/game/api.js        Firestore reads and writes (lobby, join, start, catch, pings)
 src/hooks/             useLobby, useNow (server-synced clock), useMyLocation, useRunnerPings
-src/screens/           Home, Lobby, GetReady, Game (runner + hunter), Results, Setup
-src/components/        buttons, logo, countdown ring, topographic background, map style
+src/screens/           Auth (sign up / log in), Home, Lobby, GetReady, Game (runner + hunter), Results, Setup
+src/components/        UI kit (gradient buttons, cards, avatars), effects (glow, radar pulses, skyline), code tiles, countdown ring, map style
 firestore.rules        security rules
 tests/                 unit tests for the game logic (npm test)
 ```
@@ -49,7 +49,7 @@ tests/                 unit tests for the game logic (npm test)
 
 ### 1. Firebase (free tier is enough)
 1. Create a project at <https://console.firebase.google.com>.
-2. **Build → Authentication → Sign-in method → Anonymous → Enable.**
+2. **Build → Authentication → Sign-in method → Email/Password → Enable.**
 3. **Build → Firestore Database → Create database.**
 4. Deploy the rules: `npx firebase-tools deploy --only firestore:rules`, or paste `firestore.rules` into the console's **Rules** tab.
 5. **Project settings → Your apps → Add app → Web**, then copy the config values.

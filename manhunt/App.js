@@ -7,12 +7,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts, Anton_400Regular } from '@expo-google-fonts/anton';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
-import { isFirebaseConfigured, watchUser } from './src/firebase';
+import { isFirebaseConfigured, loadUsername, watchUser } from './src/firebase';
 import { leaveLobby, measureClockOffset } from './src/game/api';
 import { useLobby } from './src/hooks/useLobby';
 import { useNow } from './src/hooks/useNow';
 import { Loading } from './src/components/ui';
 import { SetupScreen } from './src/screens/SetupScreen';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { GetReadyScreen } from './src/screens/GetReadyScreen';
@@ -39,49 +40,43 @@ export default function App() {
 }
 
 function Root() {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState({ loaded: false, name: '', code: null });
+  const [auth, setAuth] = useState({ resolved: false, user: null });
+  const [username, setUsername] = useState(null);
+  const [session, setSession] = useState({ loaded: false, code: null });
   const [offset, setOffset] = useState(0);
+  const user = auth.user;
 
-  useEffect(
-    () =>
-      watchUser((u, err) => {
-        if (err) Alert.alert('Connection problem', err.message);
-        setUser(u);
-      }),
-    []
-  );
+  useEffect(() => watchUser((u) => setAuth({ resolved: true, user: u })), []);
 
-  // Remember name + current lobby so a crash or restart drops you back into the game.
+  // The public username lives on the Firebase profile (and users/{uid} as a fallback).
   useEffect(() => {
-    AsyncStorage.getItem(SESSION_KEY)
-      .then((raw) => setSession({ loaded: true, name: '', code: null, ...(raw ? JSON.parse(raw) : {}) }))
-      .catch(() => setSession((s) => ({ ...s, loaded: true })));
-  }, []);
+    setUsername(user?.displayName || null);
+    if (user && !user.displayName) {
+      loadUsername(user.uid).then((n) => setUsername((cur) => cur || n || user.email?.split('@')[0] || 'Player'));
+    }
+  }, [user]);
 
+  // Remember the current lobby per account so a crash or restart drops you back into the game.
   useEffect(() => {
     if (!user) return;
+    setSession({ loaded: false, code: null });
+    AsyncStorage.getItem(`${SESSION_KEY}.${user.uid}`)
+      .then((raw) => setSession({ loaded: true, code: raw ? JSON.parse(raw).code : null }))
+      .catch(() => setSession({ loaded: true, code: null }));
     measureClockOffset(user.uid).then(setOffset).catch(() => {});
   }, [user]);
 
-  function saveSession(next) {
-    setSession((s) => {
-      const merged = { ...s, ...next, loaded: true };
-      AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ name: merged.name, code: merged.code })).catch(() => {});
-      return merged;
-    });
+  function saveCode(code) {
+    setSession({ loaded: true, code });
+    AsyncStorage.setItem(`${SESSION_KEY}.${user.uid}`, JSON.stringify({ code })).catch(() => {});
   }
 
-  if (!user || !session.loaded) return <Loading label="Connecting" />;
+  if (!auth.resolved) return <Loading label="Connecting" />;
+  if (!user) return <AuthScreen onSignedUp={(u) => setUsername(u?.displayName || null)} />;
+  if (!session.loaded || !username) return <Loading label="Loading profile" />;
 
   if (!session.code) {
-    return (
-      <HomeScreen
-        uid={user.uid}
-        initialName={session.name}
-        onEnterLobby={(code, name) => saveSession({ code, name })}
-      />
-    );
+    return <HomeScreen uid={user.uid} name={username} onEnterLobby={saveCode} />;
   }
 
   return (
@@ -90,7 +85,7 @@ function Root() {
       code={session.code}
       uid={user.uid}
       offset={offset}
-      onExit={() => saveSession({ code: null })}
+      onExit={() => saveCode(null)}
     />
   );
 }
@@ -134,6 +129,6 @@ function GameRouter({ code, uid, offset, onExit }) {
 
   if (lobby.status === 'lobby') return <LobbyScreen lobby={lobby} uid={uid} now={now} onLeave={leave} />;
   if (lobby.status === 'ended') return <ResultsScreen lobby={lobby} uid={uid} onLeave={leave} />;
-  if (now < lobby.startAt) return <GetReadyScreen lobby={lobby} me={me} now={now} />;
+  if (now < lobby.startAt) return <GetReadyScreen lobby={lobby} me={{ id: uid, ...me }} now={now} />;
   return <GameScreen lobby={lobby} uid={uid} now={now} offset={offset} onLeave={leave} />;
 }

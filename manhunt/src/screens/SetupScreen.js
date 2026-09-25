@@ -19,7 +19,7 @@ export function SetupScreen() {
         </Text>
         <View style={styles.box}>
           <Text style={styles.step}>1. Create a project at console.firebase.google.com</Text>
-          <Text style={styles.step}>2. Build → Authentication → enable Anonymous</Text>
+          <Text style={styles.step}>2. Build → Authentication → enable Email/Password</Text>
           <Text style={styles.step}>3. Build → Firestore Database → create</Text>
           <Text style={styles.step}>4. Deploy the rules in firestore.rules</Text>
           <Text style={styles.step}>5. Project settings → add a Web app → copy config into .env</Text>

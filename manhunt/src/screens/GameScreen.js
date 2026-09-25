@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Screen } from '../components/ui';
+import { Avatar, Button, Eyebrow, Pill, RoundIcon } from '../components/ui';
+import { Breathe, PulseRings } from '../components/fx';
 import { darkMapStyle } from '../components/mapStyle';
 import { answerCatchClaim, claimCatch, endGame, markCaught } from '../game/api';
 import {
@@ -22,7 +24,7 @@ import {
 import { usePings } from '../hooks/useLobby';
 import { useMyLocation } from '../hooks/useMyLocation';
 import { useRunnerPings } from '../hooks/useRunnerPings';
-import { colors, fonts, roleColor } from '../theme';
+import { colors, fonts, roleColor, roleGradient } from '../theme';
 
 const BANNER_MS = 20000;
 
@@ -31,7 +33,7 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
   const isRunner = me.role === 'runner';
   const accent = roleColor(me.role);
   const phase = getPhase(lobby, now);
-  const { huntStartAt, pingMs } = timeline(lobby);
+  const { startAt, huntStartAt, endAt, pingMs } = timeline(lobby);
   const pings = usePings(lobby.code, lobby.gameId);
   const { coords, latest } = useMyLocation(true);
   const mapRef = useRef(null);
@@ -149,20 +151,24 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
   let timerLabel;
   let timerValue;
   let warn = false;
+  let progress = 0;
   if (isRunner && me.caught) {
     timerLabel = 'You were caught';
     timerValue = 'OUT';
   } else if (phase.phase === 'headstart') {
     timerLabel = isRunner ? 'Head start' : 'First location in';
     timerValue = formatClock(phase.remaining);
+    progress = 1 - phase.remaining / (huntStartAt - startAt);
   } else if (phase.nextPingAt) {
     const ms = phase.nextPingAt - now;
     timerLabel = isRunner ? 'Next pin drop in' : 'Next location in';
     timerValue = formatClock(ms);
     warn = isRunner && ms <= 30000;
+    progress = 1 - ms / pingMs;
   } else {
     timerLabel = isRunner ? 'Survive for' : 'Last chance';
     timerValue = formatClock(phase.remaining);
+    progress = 1 - phase.remaining / (endAt - huntStartAt);
   }
 
   const roundStartedAt = phase.phase === 'hunt' ? huntStartAt + phase.round * pingMs : null;
@@ -174,91 +180,104 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
     : `${phase.round === 0 ? 'First' : 'New'} location pins dropped`;
 
   const claim = isRunner && !me.caught ? me.catchClaim : null;
+  const grad = roleGradient(me.role);
+  const timerColor = warn ? colors.orange : accent;
 
   return (
-    <Screen edges={['top']}>
-      <View style={styles.top}>
-        <Pressable onPress={openMenu} hitSlop={12} style={styles.topSide} accessibilityLabel="Game menu">
-          <Ionicons name="menu" size={24} color={colors.white} />
-        </Pressable>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={styles.youre}>You're a</Text>
-          <Text style={[styles.role, { color: accent }]}>{isRunner ? 'RUNNER' : 'HUNTER'}</Text>
-        </View>
-        <View style={[styles.topSide, { alignItems: 'flex-end' }]}>
-          <Text style={styles.leftLabel}>TIME LEFT</Text>
-          <Text style={styles.leftValue}>{formatClock(phase.endAt - now)}</Text>
-        </View>
-      </View>
-
-      <View style={{ alignItems: 'center', marginTop: 4 }}>
-        <MaterialCommunityIcons name={isRunner ? 'run-fast' : 'car-sports'} size={30} color={accent} />
-        <View
-          style={[
-            styles.timerCard,
-            { borderColor: warn ? colors.orange : colors.border, backgroundColor: warn ? colors.orangeDim : colors.panel },
-          ]}
-        >
-          <Text style={styles.timerLabel}>{timerLabel}</Text>
-          <Text style={[styles.timerValue, { color: warn ? colors.orange : accent }]}>{timerValue}</Text>
-        </View>
-      </View>
-
-      <View style={styles.mapWrap}>
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          customMapStyle={darkMapStyle}
-          userInterfaceStyle="dark"
-          showsUserLocation
-          showsMyLocationButton={false}
-          showsCompass={false}
-          toolbarEnabled={false}
-          showsPointsOfInterest={false}
-        >
-          {runners.map((r) => {
-            const trail = trails[r.id] || [];
-            const pin = latestPins[r.id];
-            if (!pin) return null;
-            const color = r.caught || r.left ? colors.graphite : isRunner ? colors.runner : colors.orange;
-            return (
-              <Fragment key={r.id}>
-                {trail.length > 1 ? (
-                  <Polyline
-                    coordinates={trail.map((p) => ({ latitude: p.latitude, longitude: p.longitude }))}
-                    strokeColor={color}
-                    strokeWidth={2}
-                    lineDashPattern={[6, 6]}
-                  />
-                ) : null}
-                {trail.slice(0, -1).map((p) => (
-                  <Marker key={p.id} coordinate={{ latitude: p.latitude, longitude: p.longitude }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-                    <View style={[styles.trailDot, { backgroundColor: color }]} />
-                  </Marker>
-                ))}
-                <Marker coordinate={{ latitude: pin.latitude, longitude: pin.longitude }} anchor={{ x: 0.5, y: 1 }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <View style={styles.pinLabel}>
-                      <Text style={styles.pinName}>{r.id === uid ? 'You' : r.name}</Text>
-                      <Text style={styles.pinAgo}>{r.caught ? 'caught' : formatAgo(now - pin.at)}</Text>
-                    </View>
-                    <Ionicons name="location" size={36} color={color} />
-                  </View>
+    <View style={styles.root}>
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFill}
+        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        customMapStyle={darkMapStyle}
+        userInterfaceStyle="dark"
+        showsUserLocation
+        showsMyLocationButton={false}
+        showsCompass={false}
+        toolbarEnabled={false}
+        showsPointsOfInterest={false}
+        mapPadding={{ top: 230, bottom: 260, left: 0, right: 0 }}
+      >
+        {runners.map((r) => {
+          const trail = trails[r.id] || [];
+          const pin = latestPins[r.id];
+          if (!pin) return null;
+          const out = r.caught || r.left;
+          const color = out ? colors.graphite : isRunner ? colors.runner : colors.orange;
+          return (
+            <Fragment key={r.id}>
+              {trail.length > 1 ? (
+                <Polyline
+                  coordinates={trail.map((p) => ({ latitude: p.latitude, longitude: p.longitude }))}
+                  strokeColor={color}
+                  strokeWidth={2}
+                  lineDashPattern={[6, 6]}
+                />
+              ) : null}
+              {trail.slice(0, -1).map((p) => (
+                <Marker
+                  key={p.id}
+                  coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges={false}
+                >
+                  <View style={[styles.trailDot, { borderColor: color }]} />
                 </Marker>
-              </Fragment>
-            );
-          })}
-        </MapView>
+              ))}
+              <Marker coordinate={{ latitude: pin.latitude, longitude: pin.longitude }} anchor={{ x: 0.5, y: 1 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={[styles.pinLabel, { borderColor: color }]}>
+                    <Text style={styles.pinName}>{r.id === uid ? 'You' : r.name}</Text>
+                    <Text style={[styles.pinAgo, { color }]}>{out ? 'CAUGHT' : formatAgo(now - pin.at).toUpperCase()}</Text>
+                  </View>
+                  <View style={[styles.pinStem, { backgroundColor: color }]} />
+                  <View style={[styles.pinHalo, { borderColor: color, backgroundColor: color + '33' }]}>
+                    <View style={[styles.pinCore, { backgroundColor: color }]} />
+                  </View>
+                </View>
+              </Marker>
+            </Fragment>
+          );
+        })}
+      </MapView>
 
-        <View style={styles.mapButtons}>
-          <MapButton icon="locate" onPress={recenter} label="Center on me" />
-          {Object.keys(latestPins).length ? <MapButton icon="scan" onPress={fitToPins} label="Show all pins" /> : null}
+      <LinearGradient colors={['rgba(11,11,11,0.95)', 'rgba(11,11,11,0)']} style={[styles.fadeTop, { height: insets.top + 230 }]} pointerEvents="none" />
+      <LinearGradient colors={['rgba(11,11,11,0)', 'rgba(11,11,11,0.9)']} style={styles.fadeBottom} pointerEvents="none" />
+
+      {/* HUD */}
+      <View style={[styles.hud, { top: insets.top + 6 }]} pointerEvents="box-none">
+        <View style={styles.hudRow} pointerEvents="box-none">
+          <RoundIcon name="menu" onPress={openMenu} label="Game menu" />
+          <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.rolePill}>
+            <MaterialCommunityIcons name={isRunner ? 'run-fast' : 'car-sports'} size={18} color={colors.white} />
+            <Text style={styles.roleText}>{isRunner ? 'RUNNER' : 'HUNTER'}</Text>
+          </LinearGradient>
+          <View style={styles.clockPill}>
+            <Ionicons name="hourglass-outline" size={13} color={colors.sand} />
+            <Text style={styles.clockText}>{formatClock(phase.endAt - now)}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.timerCard, warn && { borderColor: colors.orange }]}>
+          <Eyebrow style={{ color: warn ? colors.orange : colors.sand, fontSize: 10 }}>{timerLabel}</Eyebrow>
+          <Breathe amount={warn ? 0.07 : 0} duration={warn ? 400 : 100000}>
+            <Text style={[styles.timerValue, { color: timerColor, textShadowColor: timerColor }]}>{timerValue}</Text>
+          </Breathe>
+          <View style={styles.progressTrack}>
+            <LinearGradient
+              colors={warn ? [colors.orange, colors.orangeDeep] : grad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressFill, { width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%` }]}
+            />
+          </View>
         </View>
 
         {showBanner && bannerText ? (
           <View style={[styles.banner, { borderColor: accent }]}>
-            <Ionicons name="location" size={16} color={accent} />
+            <View style={[styles.bannerIcon, { backgroundColor: accent }]}>
+              <Ionicons name="location" size={14} color={colors.black} />
+            </View>
             <Text style={styles.bannerText}>{bannerText}</Text>
           </View>
         ) : null}
@@ -268,49 +287,71 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
             <Text style={styles.bannerText}>Waiting for GPS…</Text>
           </View>
         ) : null}
-        {!isRunner && phase.phase === 'headstart' ? (
-          <View style={styles.waitOverlay} pointerEvents="none">
-            <Text style={styles.waitTitle}>STAY PUT</Text>
-            <Text style={styles.waitText}>The runners are escaping. Their first location drops when the timer hits zero.</Text>
-          </View>
-        ) : null}
       </View>
 
-      <View style={[styles.panel, { paddingBottom: insets.bottom }]}>
-        <View style={styles.panelHead}>
-          <Text style={styles.panelTitle}>Runners</Text>
-          <Text style={styles.panelCount}>
-            {freeRunners.length}/{runners.length} free
-          </Text>
+      <View style={styles.mapButtons}>
+        <RoundIcon name="locate" onPress={recenter} label="Center on me" size={46} />
+        {Object.keys(latestPins).length ? <RoundIcon name="scan" onPress={fitToPins} label="Show all pins" size={46} /> : null}
+      </View>
+
+      {!isRunner && phase.phase === 'headstart' ? (
+        <View style={styles.waitWrap} pointerEvents="none">
+          <View style={styles.waitRings}>
+            <PulseRings color={colors.orange} size={200} />
+            <LinearGradient colors={grad} style={styles.waitIcon}>
+              <MaterialCommunityIcons name="car-sports" size={30} color={colors.white} />
+            </LinearGradient>
+          </View>
+          <Text style={styles.waitTitle}>STAY PUT</Text>
+          <Text style={styles.waitText}>The runners are escaping.{'\n'}Their first location drops when the timer hits zero.</Text>
         </View>
-        <ScrollView style={{ maxHeight: 136 }} contentContainerStyle={{ gap: 6 }}>
+      ) : null}
+
+      {/* Bottom sheet */}
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={styles.handle} />
+        <View style={styles.sheetHead}>
+          <Eyebrow>Runners</Eyebrow>
+          <Pill
+            icon="walk"
+            label={`${freeRunners.length}/${runners.length} FREE`}
+            color={colors.runner}
+            bg={colors.runnerDim}
+          />
+        </View>
+        <ScrollView style={{ maxHeight: 150 }} contentContainerStyle={{ gap: 8 }}>
           {runners.map((r) => {
             const pin = latestPins[r.id];
             const out = r.caught || r.left;
             let sub = 'No pin yet';
             if (r.left) sub = 'Left the game';
-            else if (r.caught) sub = `Caught ${r.caughtAt ? formatClock(r.caughtAt - huntStartAt) + ' into the hunt' : ''}`;
+            else if (r.caught) sub = `Caught${r.caughtAt ? ' at ' + formatClock(Math.max(0, r.caughtAt - huntStartAt)) : ''}`;
             else if (pin) {
               sub = `Pinned ${formatAgo(now - pin.at)}`;
               if (coords && !isRunner) sub += ` · ${formatDistance(distanceMeters(coords, pin))} away`;
             }
             return (
-              <Pressable key={r.id} onPress={() => pin && focusPin(pin)} style={styles.runnerRow}>
-                <View style={[styles.dot, { backgroundColor: out ? colors.graphite : colors.runner }]} />
+              <Pressable key={r.id} onPress={() => pin && focusPin(pin)} style={[styles.runnerRow, out && { opacity: 0.55 }]}>
+                <Avatar name={r.name} size={34} ring={out ? colors.graphite : colors.runner} />
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.runnerName, out && { color: colors.muted }]}>
-                    {r.id === uid ? `${r.name} (you)` : r.name}
-                  </Text>
+                  <Text style={styles.runnerName}>{r.id === uid ? `${r.name} (you)` : r.name}</Text>
                   <Text style={styles.runnerSub}>{sub}</Text>
                 </View>
                 {!isRunner && !out && phase.phase === 'hunt' ? (
                   r.catchClaim ? (
-                    <Text style={styles.pending}>Confirming…</Text>
+                    <Pill icon="time-outline" label="CONFIRMING" color={colors.muted} />
                   ) : (
-                    <Pressable onPress={() => tagRunner(r)} style={styles.tagButton}>
-                      <Text style={styles.tagText}>CAUGHT</Text>
+                    <Pressable onPress={() => tagRunner(r)}>
+                      <LinearGradient colors={[colors.orange, colors.orangeDeep]} style={styles.tagButton}>
+                        <MaterialCommunityIcons name="hand-back-right" size={14} color={colors.white} />
+                        <Text style={styles.tagText}>CAUGHT</Text>
+                      </LinearGradient>
                     </Pressable>
                   )
+                ) : out ? (
+                  <MaterialCommunityIcons name="handcuffs" size={20} color={colors.muted} />
+                ) : pin ? (
+                  <Ionicons name="chevron-forward" size={18} color={colors.graphite} />
                 ) : null}
               </Pressable>
             );
@@ -318,7 +359,14 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
         </ScrollView>
 
         {isRunner && !me.caught ? (
-          <Button title="I've been caught" variant="outline" onPress={surrender} style={{ marginTop: 10, height: 44 }} />
+          <Button
+            title="I've been caught"
+            icon="hand-left-outline"
+            variant="outline"
+            onPress={surrender}
+            height={46}
+            style={{ marginTop: 12 }}
+          />
         ) : null}
         <Text style={styles.tagline}>
           {isRunner ? (me.caught ? 'Watch your team. Cheer them on.' : 'Stay. Hide. Keep moving.') : 'Find them. Catch them.'}
@@ -328,13 +376,18 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
       <Modal visible={!!claim} transparent animationType="fade">
         <View style={styles.claimBackdrop}>
           <View style={styles.claimCard}>
-            <MaterialCommunityIcons name="car-sports" size={40} color={colors.orange} />
-            <Text style={styles.claimTitle}>{claim?.byName} says they caught you</Text>
+            <View style={{ width: 160, height: 160, alignItems: 'center', justifyContent: 'center' }}>
+              <PulseRings color={colors.orange} size={160} duration={1400} />
+              <LinearGradient colors={[colors.orange, colors.orangeDeep]} style={styles.claimIcon}>
+                <MaterialCommunityIcons name="handcuffs" size={34} color={colors.white} />
+              </LinearGradient>
+            </View>
+            <Text style={styles.claimTitle}>{claim?.byName?.toUpperCase()} SAYS{'\n'}THEY CAUGHT YOU</Text>
             <Text style={styles.claimText}>Be honest — did a hunter tag you?</Text>
             <Button
               title="Yes, I'm caught"
               onPress={() => answerCatchClaim(lobby.code, uid, true, now, claim.by)}
-              style={{ alignSelf: 'stretch', marginTop: 20 }}
+              style={{ alignSelf: 'stretch', marginTop: 22 }}
             />
             <Button
               title="No, I got away"
@@ -345,120 +398,116 @@ export function GameScreen({ lobby, uid, now, offset, onLeave }) {
           </View>
         </View>
       </Modal>
-    </Screen>
+    </View>
   );
 }
 
-function MapButton({ icon, onPress, label }) {
-  return (
-    <Pressable onPress={onPress} style={styles.mapButton} accessibilityLabel={label}>
-      <Ionicons name={icon} size={20} color={colors.white} />
-    </Pressable>
-  );
-}
+const glass = {
+  backgroundColor: colors.glass,
+  borderWidth: 1,
+  borderColor: colors.borderSoft,
+};
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 6 },
-  topSide: { width: 80 },
-  youre: { color: colors.sand, fontFamily: fonts.regular, fontSize: 13 },
-  role: { fontFamily: fonts.display, fontSize: 32, lineHeight: 40, letterSpacing: 1 },
-  leftLabel: { color: colors.muted, fontFamily: fonts.medium, fontSize: 9, letterSpacing: 2 },
-  leftValue: { color: colors.white, fontFamily: fonts.semibold, fontSize: 15, fontVariant: ['tabular-nums'] },
-  timerCard: {
-    marginTop: 8,
-    minWidth: 170,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 22,
-  },
-  timerLabel: { color: colors.sand, fontFamily: fonts.regular, fontSize: 12 },
-  timerValue: { fontFamily: fonts.semibold, fontSize: 28, fontVariant: ['tabular-nums'] },
-  mapWrap: { flex: 1, marginTop: 14, overflow: 'hidden', backgroundColor: colors.panel },
-  mapButtons: { position: 'absolute', right: 14, top: 14, gap: 10 },
-  mapButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(15,15,15,0.9)',
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  banner: {
-    position: 'absolute',
-    left: 14,
-    right: 70,
-    top: 14,
+  root: { flex: 1, backgroundColor: colors.black },
+  fadeTop: { position: 'absolute', top: 0, left: 0, right: 0 },
+  fadeBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 320 },
+  hud: { position: 'absolute', left: 16, right: 16, gap: 10 },
+  hudRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(15,15,15,0.92)',
-    borderWidth: 1,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 20,
+  },
+  roleText: { color: colors.white, fontFamily: fonts.display, fontSize: 18, letterSpacing: 2 },
+  clockPill: { ...glass, flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: 12, borderRadius: 21 },
+  clockText: { color: colors.white, fontFamily: fonts.semibold, fontSize: 14, fontVariant: ['tabular-nums'] },
+  timerCard: { ...glass, borderRadius: 20, alignItems: 'center', paddingTop: 12, paddingBottom: 14, paddingHorizontal: 20 },
+  timerValue: {
+    fontFamily: fonts.display,
+    fontSize: 54,
+    lineHeight: 64,
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 1,
+    textShadowRadius: 22,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  progressTrack: { alignSelf: 'stretch', height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 6, overflow: 'hidden' },
+  progressFill: { height: 4, borderRadius: 2 },
+  banner: {
+    ...glass,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  bannerText: { flex: 1, color: colors.white, fontFamily: fonts.medium, fontSize: 13 },
-  waitOverlay: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: 24,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(15,15,15,0.92)',
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  waitTitle: { color: colors.orange, fontFamily: fonts.display, fontSize: 20, letterSpacing: 2 },
+  bannerIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  bannerText: { flex: 1, color: colors.white, fontFamily: fonts.semibold, fontSize: 13 },
+  mapButtons: { position: 'absolute', right: 16, bottom: 330, gap: 10 },
+  waitWrap: { position: 'absolute', left: 0, right: 0, top: '38%', alignItems: 'center' },
+  waitRings: { width: 200, height: 200, alignItems: 'center', justifyContent: 'center' },
+  waitIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  waitTitle: { color: colors.orange, fontFamily: fonts.display, fontSize: 30, letterSpacing: 3, marginTop: -16 },
   waitText: { color: colors.sand, fontFamily: fonts.regular, fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 19 },
-  trailDot: { width: 8, height: 8, borderRadius: 4, opacity: 0.7 },
+  trailDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, backgroundColor: colors.black },
   pinLabel: {
-    backgroundColor: 'rgba(15,15,15,0.92)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: 'rgba(11,11,11,0.94)',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     alignItems: 'center',
-    marginBottom: -2,
   },
-  pinName: { color: colors.white, fontFamily: fonts.semibold, fontSize: 12 },
-  pinAgo: { color: colors.muted, fontFamily: fonts.regular, fontSize: 10 },
-  panel: { backgroundColor: colors.black, paddingHorizontal: 20, paddingTop: 14 },
-  panelHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  panelTitle: { color: colors.muted, fontFamily: fonts.medium, fontSize: 11, letterSpacing: 3, textTransform: 'uppercase' },
-  panelCount: { color: colors.runner, fontFamily: fonts.medium, fontSize: 12 },
+  pinName: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
+  pinAgo: { fontFamily: fonts.bold, fontSize: 9, letterSpacing: 1 },
+  pinStem: { width: 2, height: 10 },
+  pinHalo: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  pinCore: { width: 10, height: 10, borderRadius: 5 },
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(16,16,16,0.97)',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    borderTopWidth: 1,
+    borderColor: colors.borderSoft,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+  },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.graphite, marginBottom: 12 },
+  sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   runnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panel,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  runnerName: { color: colors.white, fontFamily: fonts.medium, fontSize: 14 },
+  runnerName: { color: colors.white, fontFamily: fonts.semibold, fontSize: 15 },
   runnerSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
-  pending: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12 },
-  tagButton: { backgroundColor: colors.orange, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 7 },
+  tagButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   tagText: { color: colors.white, fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1 },
-  tagline: { color: colors.sand, fontFamily: fonts.regular, fontSize: 13, textAlign: 'center', marginVertical: 12 },
-  claimBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center', padding: 28 },
+  tagline: { color: colors.graphite, fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 2.5, textAlign: 'center', marginTop: 12, textTransform: 'uppercase' },
+  claimBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   claimCard: {
     alignSelf: 'stretch',
     backgroundColor: colors.panel,
-    borderRadius: 16,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,75,43,0.4)',
     padding: 24,
     alignItems: 'center',
   },
-  claimTitle: { color: colors.white, fontFamily: fonts.bold, fontSize: 20, textAlign: 'center', marginTop: 12 },
-  claimText: { color: colors.sand, fontFamily: fonts.regular, fontSize: 14, marginTop: 6 },
+  claimIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  claimTitle: { color: colors.white, fontFamily: fonts.display, fontSize: 28, lineHeight: 34, textAlign: 'center', letterSpacing: 1, marginTop: 4 },
+  claimText: { color: colors.sand, fontFamily: fonts.regular, fontSize: 14, marginTop: 8 },
 });

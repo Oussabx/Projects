@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Button, Chip, Eyebrow, Header, IconButton, Screen } from '../components/ui';
+import { Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Avatar, Button, Card, Chip, Eyebrow, Header, Pill, RoundIcon, Screen } from '../components/ui';
+import { CodeBoxes } from '../components/CodeBoxes';
+import { FadeIn, Glow } from '../components/fx';
 import { kickPlayer, startGame, updateSettings } from '../game/api';
 import {
   DURATION_OPTIONS,
@@ -9,12 +13,14 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   PING_OPTIONS,
-  modeLabel,
   playerList,
+  teamSizes,
 } from '../game/logic';
 import { colors, fonts } from '../theme';
 
 export function LobbyScreen({ lobby, uid, now, onLeave }) {
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [starting, setStarting] = useState(false);
   const players = playerList(lobby);
@@ -22,6 +28,7 @@ export function LobbyScreen({ lobby, uid, now, onLeave }) {
   const s = lobby.settings;
   const missingLocation = players.filter((p) => !p.locationOk);
   const canStart = players.length >= MIN_PLAYERS && !missingLocation.length;
+  const teams = teamSizes(Math.max(players.length, MIN_PLAYERS));
 
   function confirmLeave() {
     Alert.alert('Leave lobby?', isHost ? 'Another player will become the host.' : undefined, [
@@ -56,74 +63,106 @@ export function LobbyScreen({ lobby, uid, now, onLeave }) {
   }
 
   function footerHint() {
-    if (players.length < MIN_PLAYERS) return 'Waiting for players…';
-    if (missingLocation.length) return `Waiting for ${missingLocation[0].name} to turn on location…`;
-    return isHost ? 'Roles are assigned at random.' : 'Waiting for host…';
+    if (players.length < MIN_PLAYERS) return 'Need at least 2 players';
+    if (missingLocation.length) return `Waiting for ${missingLocation[0].name} to turn on location`;
+    return isHost ? 'Ready when you are. Roles are random.' : 'Waiting for the host to start…';
   }
 
   return (
-    <Screen>
+    <Screen edges={['top']}>
+      <Glow size={width * 1.3} opacity={0.22} style={{ top: -width * 0.6, left: -width * 0.15 }} />
       <Header
-        title="Lobby"
+        eyebrow="Game lobby"
+        title="LOBBY"
         onBack={confirmLeave}
-        right={isHost ? <IconButton name="settings-outline" label="Game settings" onPress={() => setSettingsOpen(true)} /> : null}
+        right={isHost ? <RoundIcon name="options-outline" label="Game settings" onPress={() => setSettingsOpen(true)} /> : null}
       />
 
-      <View style={styles.codeBlock}>
-        <Text style={styles.codeLabel}>Lobby Code</Text>
-        <Pressable onPress={invite} style={styles.codeRow} accessibilityLabel="Share lobby code">
-          <Text style={styles.code}>{lobby.code}</Text>
-          <Ionicons name="share-outline" size={20} color={colors.orange} />
-        </Pressable>
-        <View style={styles.badges}>
-          <View style={styles.modeBadge}>
-            <Text style={styles.modeText}>{modeLabel(players.length)}</Text>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll}>
+        <FadeIn>
+          <CodeBoxes value={lobby.code} size={50} />
+          <Pressable onPress={invite} style={styles.invite}>
+            <Ionicons name="share-social" size={15} color={colors.orange} />
+            <Text style={styles.inviteText}>Invite friends</Text>
+          </Pressable>
+        </FadeIn>
+
+        <FadeIn delay={80}>
+          <Card style={styles.matchup}>
+            <View style={styles.side}>
+              <MaterialCommunityIcons name="car-sports" size={28} color={colors.orange} />
+              <Text style={[styles.sideCount, { color: colors.orange }]}>{teams.hunters}</Text>
+              <Text style={styles.sideLabel}>HUNTERS</Text>
+            </View>
+            <Text style={styles.vs}>VS</Text>
+            <View style={styles.side}>
+              <MaterialCommunityIcons name="run-fast" size={28} color={colors.runner} />
+              <Text style={[styles.sideCount, { color: colors.runner }]}>{teams.runners}</Text>
+              <Text style={styles.sideLabel}>RUNNERS</Text>
+            </View>
+          </Card>
+          <View style={styles.pills}>
+            <Pill icon="timer-outline" label={`${s.headStartMin} MIN HEAD START`} />
+            <Pill icon="hourglass-outline" label={`${s.durationMin} MIN HUNT`} />
+            <Pill icon="location-outline" label={`PIN / ${s.pingIntervalMin} MIN`} />
           </View>
-          <Text style={styles.settingsSummary}>
-            {s.headStartMin} min head start · {s.durationMin} min hunt · pin every {s.pingIntervalMin} min
+        </FadeIn>
+
+        <View style={styles.listHead}>
+          <Eyebrow>Players</Eyebrow>
+          <Text style={styles.count}>
+            {players.length}
+            <Text style={{ color: colors.graphite }}>/{MAX_PLAYERS}</Text>
           </Text>
         </View>
-      </View>
+        <View style={styles.segments}>
+          {Array.from({ length: MAX_PLAYERS }).map((_, i) => (
+            <View key={i} style={[styles.segment, i < players.length && styles.segmentOn]} />
+          ))}
+        </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.list}>
-        {players.map((p) => (
-          <Pressable key={p.id} onLongPress={() => onPlayerPress(p)} style={styles.row}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={14} color={colors.sand} />
-            </View>
-            <Text style={styles.name} numberOfLines={1}>
-              {p.id === uid ? 'You' : p.name}
-              {p.id === uid ? <Text style={styles.youName}>{`  ${p.name}`}</Text> : null}
-            </Text>
-            {p.id === lobby.hostId ? <Text style={styles.hostTag}>HOST</Text> : null}
-            <Ionicons
-              name={p.locationOk ? 'location' : 'location-outline'}
-              size={16}
-              color={p.locationOk ? colors.runner : colors.orange}
-            />
-          </Pressable>
+        {players.map((p, i) => (
+          <FadeIn key={p.id} delay={120 + i * 60}>
+            <Pressable onLongPress={() => onPlayerPress(p)}>
+              <Card style={styles.row} glow={p.id === uid ? 'rgba(255,75,43,0.45)' : undefined}>
+                <Avatar name={p.name} size={38} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {p.name}
+                    {p.id === uid ? <Text style={styles.you}>  YOU</Text> : null}
+                  </Text>
+                  <Text style={[styles.status, { color: p.locationOk ? colors.runner : colors.orange }]}>
+                    {p.locationOk ? '● GPS ready' : '● Location off'}
+                  </Text>
+                </View>
+                {p.id === lobby.hostId ? (
+                  <Pill icon="star" label="HOST" color={colors.orange} bg={colors.orangeDim} />
+                ) : null}
+              </Card>
+            </Pressable>
+          </FadeIn>
         ))}
         {Array.from({ length: Math.max(0, MAX_PLAYERS - players.length) }).map((_, i) => (
-          <Pressable key={`empty-${i}`} onPress={invite} style={[styles.row, styles.emptyRow]}>
-            <View style={[styles.avatar, { borderStyle: 'dashed' }]}>
-              <Ionicons name="add" size={14} color={colors.graphite} />
+          <Pressable key={`empty-${i}`} onPress={invite} style={styles.emptyRow}>
+            <View style={styles.emptyAvatar}>
+              <Ionicons name="add" size={18} color={colors.graphite} />
             </View>
-            <Text style={styles.emptyText}>Invite a player</Text>
+            <Text style={styles.emptyText}>Open slot — tap to invite</Text>
           </Pressable>
         ))}
-        <Text style={styles.teamsNote}>
-          1 vs 1 up to 3 vs 3. Hunters drive, runners go on foot. Every phone needs Manhunt open with location on.
-        </Text>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Text style={styles.count}>
-          {players.length}/{MAX_PLAYERS}
-        </Text>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <LinearGradient colors={['rgba(11,11,11,0)', colors.black]} style={styles.fade} pointerEvents="none" />
         <Text style={styles.hint}>{footerHint()}</Text>
         {isHost ? (
-          <Button title="Start Game" onPress={handleStart} disabled={!canStart} loading={starting} style={{ marginTop: 14, alignSelf: 'stretch' }} />
-        ) : null}
+          <Button title="Start Game" icon="flash" onPress={handleStart} disabled={!canStart} loading={starting} />
+        ) : (
+          <View style={styles.waiting}>
+            <MaterialCommunityIcons name="timer-sand" size={16} color={colors.muted} />
+            <Text style={styles.waitingText}>Host starts the game</Text>
+          </View>
+        )}
       </View>
 
       <SettingsSheet
@@ -141,35 +180,42 @@ function SettingsSheet({ visible, settings, onClose, onChange }) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Game settings</Text>
+        <View style={styles.handle} />
+        <Text style={styles.sheetTitle}>GAME SETTINGS</Text>
         <OptionRow
+          icon="timer-outline"
           label="Runner head start"
           options={HEAD_START_OPTIONS}
           value={settings.headStartMin}
           onSelect={(v) => onChange({ headStartMin: v })}
         />
         <OptionRow
+          icon="hourglass-outline"
           label="Hunt duration"
           options={DURATION_OPTIONS}
           value={settings.durationMin}
           onSelect={(v) => onChange({ durationMin: v })}
         />
         <OptionRow
+          icon="location-outline"
           label="Location pin every"
           options={PING_OPTIONS}
           value={settings.pingIntervalMin}
           onSelect={(v) => onChange({ pingIntervalMin: v })}
         />
-        <Button title="Done" onPress={onClose} style={{ marginTop: 12 }} />
+        <Button title="Done" onPress={onClose} style={{ marginTop: 8 }} />
       </View>
     </Modal>
   );
 }
 
-function OptionRow({ label, options, value, onSelect }) {
+function OptionRow({ icon, label, options, value, onSelect }) {
   return (
-    <View style={{ marginBottom: 20 }}>
-      <Eyebrow style={{ marginBottom: 10 }}>{label}</Eyebrow>
+    <View style={{ marginBottom: 22 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <Ionicons name={icon} size={14} color={colors.orange} />
+        <Eyebrow>{label}</Eyebrow>
+      </View>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
         {options.map((o) => (
           <Chip key={o} label={`${o} MIN`} selected={o === value} onPress={() => onSelect(o)} />
@@ -180,53 +226,81 @@ function OptionRow({ label, options, value, onSelect }) {
 }
 
 const styles = StyleSheet.create({
-  codeBlock: { alignItems: 'center', paddingTop: 8, paddingBottom: 18 },
-  codeLabel: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12 },
-  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  code: { color: colors.white, fontFamily: fonts.semibold, fontSize: 34, letterSpacing: 4 },
-  badges: { alignItems: 'center', gap: 8, marginTop: 10 },
-  modeBadge: { borderWidth: 1, borderColor: colors.orange, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 3 },
-  modeText: { color: colors.orange, fontFamily: fonts.display, fontSize: 14, letterSpacing: 2 },
-  settingsSummary: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12 },
-  list: { paddingHorizontal: 20, gap: 8, paddingBottom: 16 },
-  row: {
-    height: 50,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panel,
+  scroll: { paddingHorizontal: 20, paddingBottom: 150, gap: 10 },
+  invite: {
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    gap: 12,
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: colors.orangeDim,
   },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  inviteText: { color: colors.orange, fontFamily: fonts.semibold, fontSize: 13 },
+  matchup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 16, marginTop: 10 },
+  side: { alignItems: 'center', gap: 2, width: 100 },
+  sideCount: { fontFamily: fonts.display, fontSize: 40, lineHeight: 48 },
+  sideLabel: { color: colors.sand, fontFamily: fonts.semibold, fontSize: 10, letterSpacing: 2.5 },
+  vs: { color: colors.graphite, fontFamily: fonts.display, fontSize: 26, letterSpacing: 2 },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 10 },
+  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 14 },
+  count: { color: colors.white, fontFamily: fonts.display, fontSize: 20 },
+  segments: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+  segment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  segmentOn: { backgroundColor: colors.orange },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  name: { color: colors.white, fontFamily: fonts.semibold, fontSize: 16 },
+  you: { color: colors.orange, fontFamily: fonts.bold, fontSize: 10, letterSpacing: 1.5 },
+  status: { fontFamily: fonts.medium, fontSize: 11, marginTop: 2 },
+  emptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
     borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+  },
+  emptyAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderStyle: 'dashed',
     borderColor: colors.graphite,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  name: { flex: 1, color: colors.white, fontFamily: fonts.medium, fontSize: 15 },
-  youName: { color: colors.muted, fontFamily: fonts.regular, fontSize: 13 },
-  hostTag: { color: colors.orange, fontFamily: fonts.semibold, fontSize: 10, letterSpacing: 2 },
-  emptyRow: { backgroundColor: 'transparent', borderStyle: 'dashed' },
-  emptyText: { color: colors.graphite, fontFamily: fonts.regular, fontSize: 14 },
-  teamsNote: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 10 },
-  footer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12, alignItems: 'center' },
-  count: { color: colors.white, fontFamily: fonts.medium, fontSize: 18 },
-  hint: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, marginTop: 2 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+  emptyText: { color: colors.graphite, fontFamily: fonts.medium, fontSize: 14 },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, backgroundColor: colors.black },
+  fade: { position: 'absolute', left: 0, right: 0, top: -40, height: 40 },
+  hint: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, textAlign: 'center', marginBottom: 10, marginTop: 6 },
+  waiting: {
+    height: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  waitingText: { color: colors.muted, fontFamily: fonts.medium, fontSize: 14 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' },
   sheet: {
     backgroundColor: colors.panel,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
+    paddingTop: 12,
     paddingBottom: 40,
     borderTopWidth: 1,
     borderColor: colors.border,
   },
-  sheetTitle: { color: colors.white, fontFamily: fonts.bold, fontSize: 18, marginBottom: 20 },
+  handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.graphite, marginBottom: 18 },
+  sheetTitle: { color: colors.white, fontFamily: fonts.display, fontSize: 22, letterSpacing: 1.5, marginBottom: 20 },
 });
