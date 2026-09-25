@@ -3,9 +3,11 @@
 const UI = (() => {
   const $ = sel => document.querySelector(sel);
   const TAB_IDS = ['shop', 'gear', 'play', 'skills', 'ranks'];
+  const STAT_ICON = { hp: ['heart', '#ff4d5e'], dmg: ['burst', '#ff8a1f'], rate: ['fire', '#ff6a2a'], crit: ['target', '#2fe0c4'] };
   let tab = 2;
   let selectedLevel = 0;
-  let heroRaf = 0;
+  let gearFilter = 'all';
+  let sceneRaf = 0;
   let paused = false;
 
   // ---------- Helpers ----------
@@ -25,26 +27,33 @@ const UI = (() => {
     toast.timer = setTimeout(() => { t.hidden = true; }, 1600);
   }
 
-  function modal(html) {
+  function sheet(title, body, opts = {}) {
     const m = $('#modal');
-    m.innerHTML = `<div class="modal-card">${html}</div>`;
+    m.innerHTML = `<div class="sheet ${opts.cls || ''}">
+      <div class="ribbon ${opts.ribbon || ''}"><span class="tx">${title}</span></div>
+      ${opts.close ? `<button class="close" id="m-close" aria-label="Close">${icon('close')}</button>` : ''}
+      ${body}
+    </div>`;
     m.hidden = false;
+    const c = $('#m-close');
+    if (c) c.onclick = closeModal;
     return m;
   }
   function closeModal() { $('#modal').hidden = true; $('#modal').innerHTML = ''; }
 
   function slotDef(id) { return SLOTS.find(s => s.id === id); }
+  function progress() { return save.progress.ch1; }
 
-  function itemTile(item, opts = {}) {
+  function tile(item, opts = {}) {
     const rar = RARITIES[item.rarity];
     const eq = save.equipped[item.slot] === item.id;
-    return `<button class="item rar-${rar.id}" data-item="${item.id}" aria-label="${itemName(item)}">
-      ${icon(item.slot, '#ffffff', opts.size || 40)}
-      ${eq && !opts.noTag ? '<span class="equipped-tag">ON</span>' : ''}
+    return `<button class="tile r-${rar.id} ${opts.cls || ''}" data-item="${item.id}" aria-label="${rar.name} ${itemName(item)}">
+      ${icon(item.slot, '#ffffff', 64)}<span class="gem-dot"></span>
+      ${eq && !opts.noTag ? '<span class="tag tx">ON</span>' : ''}
     </button>`;
   }
 
-  function progress() { return save.progress.ch1; }
+  function statIcon(stat) { const [n, c] = STAT_ICON[stat]; return icon(n, c, 26); }
 
   // ---------- Top bar ----------
 
@@ -53,18 +62,25 @@ const UI = (() => {
     $('#gems').textContent = fmt(save.gems);
     $('#profile-name').textContent = save.name;
     $('#profile-power').textContent = fmt(playerStats().power);
+    $('#profile-lvl').textContent = 1 + totalStars();
     const c = $('#avatar-canvas').getContext('2d');
-    c.clearRect(0, 0, 80, 80);
-    drawSoldierFront(c, 40, 118, 110, 0);
+    c.clearRect(0, 0, 96, 96);
+    drawSoldierFront(c, 48, 150, 140, 0);
     renderNavDots();
   }
 
   function renderNavDots() {
-    // Red dot on Skills when an upgrade is affordable.
-    const affordable = SKILLS.some(s => save.skills[s.id] < SKILL_MAX && save.coins >= skillCost(save.skills[s.id]));
-    const btn = document.querySelector('.navbar [data-tab="3"]');
-    btn.querySelector('.nav-dot')?.remove();
-    if (affordable) btn.insertAdjacentHTML('beforeend', '<span class="nav-dot"></span>');
+    const canSkill = SKILLS.some(s => save.skills[s.id] < SKILL_MAX && save.coins >= skillCost(save.skills[s.id]));
+    const canChest = CHESTS.some(c => save[c.currency] >= c.price);
+    const upgrade = SLOTS.some(s => {
+      const cur = getItem(save.equipped[s.id]);
+      return save.inventory.some(i => i.slot === s.id && (!cur || itemStat(i) > itemStat(cur)));
+    });
+    const dots = { 0: canChest, 1: upgrade, 3: canSkill };
+    document.querySelectorAll('.navbar .tab').forEach(b => {
+      b.querySelector('.tab-dot')?.remove();
+      if (dots[b.dataset.tab]) b.insertAdjacentHTML('beforeend', '<span class="tab-dot"></span>');
+    });
   }
 
   // ---------- Navigation ----------
@@ -72,14 +88,14 @@ const UI = (() => {
   function setTab(i) {
     tab = i;
     $('#track').style.transform = `translateX(-${i * 20}%)`;
-    document.querySelectorAll('.navbar button').forEach((b, j) => b.classList.toggle('active', j === i));
+    document.querySelectorAll('.navbar .tab').forEach((b, j) => b.classList.toggle('active', j === i));
     render(TAB_IDS[i]);
-    if (i === 2) startHero(); else stopHero();
   }
 
   function render(id) {
     ({ shop: renderShop, gear: renderGear, play: renderPlay, skills: renderSkills, ranks: renderRanks })[id]();
     renderTop();
+    if (tab === 2 && $('#game-view').hidden) startScene(); else stopScene();
   }
 
   // ---------- Play ----------
@@ -89,66 +105,133 @@ const UI = (() => {
     const ch = CHAPTERS[0];
     selectedLevel = Math.min(selectedLevel, pr.unlocked - 1);
     const lvl = ch.levels[selectedLevel];
+    const power = playerStats().power;
     const stars = pr.stars.reduce((a, b) => a + b, 0);
+    const starRow = n => [0, 1, 2].map(s => icon('star', s < n ? '#ffc933' : '#2a2f6e', 14)).join('');
     const nodes = ch.levels.map((l, i) => {
       const locked = i >= pr.unlocked;
-      const done = pr.stars[i] > 0;
-      const cls = [locked ? 'locked' : done ? 'done' : 'open', i === selectedLevel ? 'selected' : '', i === 5 ? 'boss' : ''].join(' ');
-      const starHtml = [0, 1, 2].map(s => s < pr.stars[i] ? '<b>★</b>' : '★').join('');
-      return `<button class="lvl ${cls}" data-level="${i}">
-        <div class="lvl-node">${locked ? icon('lock', '', 24) : i === 5 ? '☠' : i + 1}</div>
-        <div class="lvl-stars">${locked ? '' : starHtml}</div>
+      const state = locked ? 'locked' : pr.stars[i] > 0 ? 'done' : 'open';
+      const cls = [state, i === selectedLevel ? 'selected' : '', l.boss.final ? 'boss' : ''].join(' ');
+      const face = locked ? icon('lock', '', 26) : l.boss.final ? icon('skull', '#fff', 26) : `<span class="tx">${i + 1}</span>`;
+      return `<button class="node ${cls}" data-level="${i}" aria-label="Level ${i + 1}">
+        <span class="node-ball">${face}</span>
+        <span class="node-stars">${locked ? '' : starRow(pr.stars[i])}</span>
       </button>`;
     }).join('');
+    const fill = Math.min(pr.unlocked - 1, 5) / 5 * 80;
+    const weak = power < lvl.power;
 
     $('#screen-play').innerHTML = `
-      <div class="play-screen">
-        <div class="chapter-card">
-          <div class="chapter-head"><h2>Chapter 1</h2><span class="chapter-sub">${ch.name}</span></div>
-          <div class="hero-wrap">
-            <div class="power-badge">⚡ ${fmt(playerStats().power)}</div>
-            <div class="power-badge stars-badge">★ ${stars}/18</div>
-            <canvas id="hero-canvas" width="360" height="380"></canvas>
-          </div>
-          <div class="level-path">${nodes}</div>
-          <div class="level-info">
-            <div>
-              <div class="name outline">Level ${selectedLevel + 1}: ${lvl.name}</div>
-              <div class="boss-name">Boss: ${lvl.boss.name} · Best ${fmt(pr.best[selectedLevel])}</div>
-            </div>
+      <div class="chapter-bar">
+        <button class="chapter-arrow left" disabled aria-label="Previous chapter">${icon('arrow', '#ffc933')}</button>
+        <div class="chapter-title"><small class="tx">CHAPTER 1</small><span class="tx">${ch.name}</span></div>
+        <button class="chapter-arrow" id="next-ch" aria-label="Next chapter">${icon('arrow', '#ffc933')}</button>
+      </div>
+      <div class="scene">
+        <canvas id="scene-canvas"></canvas>
+        <div class="scene-badges">
+          <span class="badge tx">${icon('bolt', '#ffc933')}${fmt(power)}</span>
+          <span class="badge tx">${icon('star', '#ffc933')}${stars}/18</span>
+        </div>
+      </div>
+      <div class="panel"><div class="path"><div class="path-fill" style="width:${fill}%"></div>${nodes}</div></div>
+      <div class="panel level-card">
+        <div>
+          <div class="name tx">Level ${selectedLevel + 1} · ${lvl.name}</div>
+          <div class="level-meta">
+            <span class="chip tx">${icon('skull', '#ff9aa4')}${lvl.boss.name}</span>
+            <span class="chip tx ${weak ? 'warn' : 'ok'}">${icon('bolt', '#ffc933')}Rec. ${lvl.power}</span>
+            <span class="chip tx">${icon('ranks', '#ffc933')}Best ${fmt(pr.best[selectedLevel])}</span>
           </div>
         </div>
-        <div class="battle-row"><button class="btn big" id="battle-btn">BATTLE!</button></div>
-        <div class="panel locked-card">${icon('lock', '', 28)}<div class="outline">Chapter 2 · Coming soon</div></div>
-      </div>`;
+        <canvas class="boss-portrait" id="boss-portrait" width="128" height="128"></canvas>
+      </div>
+      <button class="btn battle-btn" id="battle-btn"><span class="tx">BATTLE!</span></button>`;
 
-    $('#screen-play').querySelectorAll('.lvl').forEach(b => b.addEventListener('click', () => {
+    const bp = $('#boss-portrait').getContext('2d');
+    drawZombie(bp, 64, 200, 170, 0, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.15, shirt: '#4a3f7a' });
+
+    $('#screen-play').querySelectorAll('.node').forEach(b => b.addEventListener('click', () => {
       const i = +b.dataset.level;
       if (i >= pr.unlocked) { toast('Beat the previous level first'); return; }
       selectedLevel = i;
-      renderPlay();
+      render('play');
     }));
-    $('#battle-btn').addEventListener('click', () => startLevel(selectedLevel));
-    if (tab === 2 && $('#game-view').hidden) startHero();
+    $('#next-ch').onclick = () => toast('Chapter 2 is coming soon');
+    $('#battle-btn').onclick = () => startLevel(selectedLevel);
   }
 
-  function startHero() {
-    stopHero();
-    const cv = document.getElementById('hero-canvas');
+  // Animated street scene behind the hero on the Play tab.
+  function startScene() {
+    stopScene();
+    const cv = document.getElementById('scene-canvas');
     if (!cv) return;
     const c = cv.getContext('2d');
+    const lvl = CHAPTERS[0].levels[selectedLevel];
+    const colors = ['#f28a3c', '#e8563a', '#ff9d4a', '#8cbf4a'];
+    const walkers = Array.from({ length: 7 }, (_, i) => ({ x: (i / 6) * 1.6 - 0.8, z: 0.3 + ((i * 37) % 10) / 20, t: i * 1.3, color: colors[i % 4] }));
     const t0 = performance.now();
     const frame = now => {
       const t = (now - t0) / 1000;
-      c.clearRect(0, 0, cv.width, cv.height);
-      c.fillStyle = 'rgba(0,0,0,.25)';
-      c.beginPath(); c.ellipse(180, 350, 110, 20, 0, 0, Math.PI * 2); c.fill();
-      drawSoldierFront(c, 180, 350, 300, t);
-      heroRaf = requestAnimationFrame(frame);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = cv.clientWidth, h = cv.clientHeight;
+      if (w && h) {
+        if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawMenuScene(c, w, h, t, lvl, walkers);
+      }
+      sceneRaf = requestAnimationFrame(frame);
     };
-    heroRaf = requestAnimationFrame(frame);
+    sceneRaf = requestAnimationFrame(frame);
   }
-  function stopHero() { cancelAnimationFrame(heroRaf); }
+  function stopScene() { cancelAnimationFrame(sceneRaf); }
+
+  function drawMenuScene(c, w, h, t, lvl, walkers) {
+    const hz = h * 0.46;
+    // Sunset sky
+    const sky = c.createLinearGradient(0, 0, 0, hz);
+    sky.addColorStop(0, '#5a3fd6'); sky.addColorStop(0.55, '#ff6fae'); sky.addColorStop(1, '#ffc46b');
+    c.fillStyle = sky; c.fillRect(0, 0, w, hz);
+    c.fillStyle = 'rgba(255,240,180,.9)';
+    c.beginPath(); c.arc(w * 0.72, hz * 0.5, h * 0.09, 0, Math.PI * 2); c.fill();
+    // Skyline with lit windows
+    const bw = w / 9;
+    for (let i = 0; i < 10; i++) {
+      const bh = hz * (0.35 + ((i * 53) % 7) / 12);
+      const x = i * bw - bw * 0.3;
+      c.fillStyle = i % 2 ? '#3b2a8f' : '#4a35a8';
+      c.fillRect(x, hz - bh, bw * 0.92, bh);
+      c.fillStyle = '#ffd35a';
+      for (let wy = hz - bh + 8; wy < hz - 8; wy += 12) {
+        for (let wx = x + 6; wx < x + bw * 0.92 - 8; wx += 10) {
+          if (((wx * 7 + wy * 3 + i) | 0) % 5 === 0) c.fillRect(wx, wy, 4, 6);
+        }
+      }
+    }
+    // Ground and road
+    const g = c.createLinearGradient(0, hz, 0, h);
+    g.addColorStop(0, '#7b86d6'); g.addColorStop(1, '#5561b8');
+    c.fillStyle = g; c.fillRect(0, hz, w, h - hz);
+    c.fillStyle = '#4b4f8a';
+    c.beginPath(); c.moveTo(w * 0.36, hz); c.lineTo(w * 0.64, hz); c.lineTo(w * 1.05, h); c.lineTo(-w * 0.05, h); c.fill();
+    c.fillStyle = '#ffd35a';
+    for (let i = 0; i < 5; i++) {
+      const f0 = (i + (t * 0.6) % 1) / 5, f1 = f0 + 0.08;
+      const y0 = hz + (h - hz) * f0 * f0, y1 = hz + (h - hz) * f1 * f1;
+      const w0 = 1 + f0 * 5, w1 = 1 + f1 * 5;
+      c.beginPath(); c.moveTo(w / 2 - w0, y0); c.lineTo(w / 2 + w0, y0); c.lineTo(w / 2 + w1, y1); c.lineTo(w / 2 - w1, y1); c.fill();
+    }
+    // Boss looming behind, then the horde
+    drawZombie(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.2, shirt: '#4a3f7a' });
+    for (const z of walkers) {
+      const y = hz + (h - hz) * z.z * 0.55;
+      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: z.color, shirt: '#6b4fb8' });
+    }
+    drawCone(c, w * 0.1, h * 0.93, h * 0.13);
+    drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, '');
+    // Hero
+    drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);
+  }
 
   // ---------- Gear ----------
 
@@ -156,35 +239,42 @@ const UI = (() => {
     const st = playerStats();
     const slotHtml = s => {
       const it = getItem(save.equipped[s.id]);
-      return it
-        ? `<div style="position:relative">${itemTile(it, { noTag: true }).replace('class="item', 'class="slot item')}<div class="slot-label">${s.label}</div></div>`
-        : `<div style="position:relative"><div class="slot empty">${icon(s.id, '#ffffff', 40)}</div><div class="slot-label">${s.label}</div></div>`;
+      return `<div class="slot-wrap">${it ? tile(it, { noTag: true }) : `<div class="tile empty">${icon(s.id, '#ffffff', 64)}</div>`}<span class="slot-name tx">${s.name}</span></div>`;
     };
-    const inv = [...save.inventory].sort((a, b) => b.rarity - a.rarity || itemStat(b) - itemStat(a));
+    const inv = save.inventory
+      .filter(i => gearFilter === 'all' || i.slot === gearFilter)
+      .sort((a, b) => b.rarity - a.rarity || itemStat(b) - itemStat(a));
+    const filters = [['all', 'All', ''], ...SLOTS.map(s => [s.id, s.name, icon(s.id, '#fff', 20)])]
+      .map(([id, name, ic]) => `<button class="filter tx ${gearFilter === id ? 'on' : ''}" data-filter="${id}">${ic}${name}</button>`).join('');
+    const stat = (k, label, val) => `<div class="stat">${statIcon(k)}<div><span class="stat-label">${label}</span><span class="stat-val tx">${val}</span></div></div>`;
 
     $('#screen-gear').innerHTML = `
-      <h2>Gear</h2>
-      <div class="panel">
-        <div class="gear-top">
-          <div class="gear-col">${slotHtml(SLOTS[0])}${slotHtml(SLOTS[2])}</div>
-          <canvas id="gear-canvas" width="320" height="368"></canvas>
-          <div class="gear-col">${slotHtml(SLOTS[1])}${slotHtml(SLOTS[3])}</div>
-        </div>
-        <div class="stats-grid">
-          <div class="stat-row">❤ Health <b>${fmt(st.hp)}</b></div>
-          <div class="stat-row">💥 Damage <b>${fmt(st.dmg)}</b></div>
-          <div class="stat-row">🔥 Fire/s <b>${st.rate.toFixed(1)}</b></div>
-          <div class="stat-row">🎯 Crit <b>${Math.round(st.crit * 100)}%</b></div>
-        </div>
+      <div class="ribbon purple"><span class="tx">Gear</span></div>
+      <div class="panel gear-stage">
+        <div class="gear-col">${slotHtml(SLOTS[0])}${slotHtml(SLOTS[2])}</div>
+        <div class="gear-hero"><canvas id="gear-canvas" width="300" height="345"></canvas></div>
+        <div class="gear-col">${slotHtml(SLOTS[1])}${slotHtml(SLOTS[3])}</div>
       </div>
-      <div class="inv-head"><h3>Backpack (${inv.length})</h3><button class="btn small green" id="equip-best">Equip best</button></div>
-      <div class="inventory">${inv.length ? inv.map(i => itemTile(i)).join('') : '<div class="empty-note">Open chests in the Shop to get gear.</div>'}</div>`;
+      <div class="panel stats-grid">
+        ${stat('hp', 'Health', fmt(st.hp))}
+        ${stat('dmg', 'Damage', fmt(st.dmg))}
+        ${stat('rate', 'Shots / sec', st.rate.toFixed(1))}
+        ${stat('crit', 'Crit chance', Math.round(st.crit * 100) + '%')}
+      </div>
+      <div class="sub-head"><h3 class="tx">Backpack · ${save.inventory.length}</h3><button class="btn small green" id="equip-best"><span class="tx">Equip best</span></button></div>
+      <div class="filters">${filters}</div>
+      <div class="inventory">${inv.length ? inv.map(i => tile(i)).join('') : '<div class="empty-note">No gear here yet. Open chests in the Shop to find some.</div>'}</div>`;
 
-    const c = $('#gear-canvas').getContext('2d');
-    drawSoldierFront(c, 160, 350, 300, 0);
+    drawSoldierFront($('#gear-canvas').getContext('2d'), 150, 330, 290, 0);
+    const s = $('#screen-gear');
+    s.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
+    s.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { gearFilter = b.dataset.filter; render('gear'); }));
+    $('#equip-best').onclick = () => { equipBest(); render('gear'); toast('Best gear equipped'); };
+  }
 
-    $('#screen-gear').querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
-    $('#equip-best').addEventListener('click', () => { equipBest(); renderGear(); renderTop(); toast('Best gear equipped'); });
+  function statLine(item) {
+    const slot = slotDef(item.slot);
+    return `<span class="item-stat tx">${statIcon(slot.stat)}${slot.fmt(itemStat(item))}</span>`;
   }
 
   function itemDetail(id) {
@@ -194,53 +284,51 @@ const UI = (() => {
     const slot = slotDef(item.slot);
     const cur = getItem(save.equipped[item.slot]);
     const isEq = cur && cur.id === item.id;
-    let compare = '';
+    let delta = '';
     if (!isEq) {
-      const diff = itemStat(item) - (cur ? itemStat(cur) : 0);
-      compare = `<div class="compare">vs equipped: <span class="${diff >= 0 ? 'up' : 'down'}">${diff >= 0 ? '▲' : '▼'} ${slot.fmt(Math.abs(diff)).replace('+', '')}</span></div>`;
+      const d = itemStat(item) - (cur ? itemStat(cur) : 0);
+      delta = `<span class="delta tx ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${slot.fmt(Math.abs(d)).replace('+', '')} vs equipped</span>`;
     }
-    modal(`
-      <div class="reveal">${itemTile(item, { size: 64, noTag: true })}</div>
-      <div class="rarity-label outline" style="color:${rar.color}">${rar.name}</div>
-      <h2 style="font-size:1.4rem">${itemName(item)}</h2>
-      <div class="item-stat">${slot.fmt(itemStat(item))}</div>
-      ${compare}
-      <div class="modal-actions">
-        ${isEq ? '<button class="btn grey" disabled>Equipped</button>' : '<button class="btn green" id="m-equip">Equip</button>'}
-        ${isEq ? '' : `<button class="btn red" id="m-salvage">Salvage ${icon('coin', '', 18)}${rar.salvage}</button>`}
-      </div>
-      <div class="modal-actions"><button class="btn grey small" id="m-close">Close</button></div>`);
-    $('#m-close').onclick = closeModal;
+    sheet(slot.name, `
+      <div class="rays-wrap" style="--glow:${rar.color}"><div class="rays"></div>${tile(item, { noTag: true, cls: 'big reveal' })}</div>
+      <div class="rarity tx" style="color:${rar.color}">${rar.name}</div>
+      <div class="item-name tx">${itemName(item)}</div>
+      ${statLine(item)}
+      ${delta}
+      <div class="actions">
+        ${isEq ? '<button class="btn grey" disabled><span class="tx">Equipped</span></button>'
+               : `<button class="btn red" id="m-salvage"><span class="tx">Sell</span>${icon('coin')}<span class="tx">${rar.salvage}</span></button>
+                  <button class="btn green" id="m-equip"><span class="tx">Equip</span></button>`}
+      </div>`, { close: true, ribbon: 'purple' });
     if (!isEq) {
-      $('#m-equip').onclick = () => { equip(item.id); closeModal(); renderGear(); renderTop(); };
-      $('#m-salvage').onclick = () => { const v = salvage(item.id); closeModal(); renderGear(); renderTop(); toast(`+${v} coins`); };
+      $('#m-equip').onclick = () => { equip(item.id); closeModal(); render('gear'); toast('Equipped'); };
+      $('#m-salvage').onclick = () => { const v = salvage(item.id); closeModal(); render('gear'); toast(`Sold for ${v} coins`); };
     }
   }
 
   // ---------- Skills ----------
 
   function renderSkills() {
-    const colors = { hp: '#ff5a5a', dmg: '#ff9a2e', rate: '#ffd23a', crit: '#3d9bff' };
-    const icons = { hp: '❤', dmg: '💥', rate: '🔥', crit: '🎯' };
+    const bg = { hp: 'linear-gradient(#ff9aa4,#e0243a)', dmg: 'linear-gradient(#ffc27a,#ff7a1a)', rate: 'linear-gradient(#ffe98a,#ffb000)', crit: 'linear-gradient(#8ff5e4,#1fb8a0)' };
     $('#screen-skills').innerHTML = `
-      <h2>Skills</h2>
+      <div class="ribbon green"><span class="tx">Skills</span></div>
       ${SKILLS.map(s => {
         const lvl = save.skills[s.id];
         const max = lvl >= SKILL_MAX;
         const cost = skillCost(lvl);
         return `<div class="panel skill">
-          <div class="skill-icon" style="background:${colors[s.id]};font-size:1.6rem">${icons[s.id]}</div>
+          <div class="skill-icon" style="background:${bg[s.id]}">${icon(STAT_ICON[s.id][0], '#fff', 38)}<span class="lv tx">Lv ${lvl}</span></div>
           <div>
-            <div class="skill-name outline">${s.name} <span style="color:var(--yellow)">Lv ${lvl}</span></div>
-            <div class="skill-desc">${s.desc}: ${s.fmt(lvl)}${max ? '' : ` → <span style="color:#8ef08e">${s.fmt(lvl + 1)}</span>`}</div>
+            <div class="skill-name tx">${s.name}</div>
+            <div class="skill-desc">${s.desc} ${s.fmt(lvl).split(' ')[0]}${max ? '' : ` → <b>${s.fmt(lvl + 1).split(' ')[0]}</b>`}</div>
             <div class="pips">${Array.from({ length: SKILL_MAX }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div>
           </div>
           <button class="btn small ${max ? 'grey' : 'green'}" data-skill="${s.id}" ${max || save.coins < cost ? 'disabled' : ''}>
-            ${max ? 'MAX' : `${icon('coin', '', 16)}${fmt(cost)}`}
+            ${max ? '<span class="tx">MAX</span>' : `<span class="tx">${icon('coin')}${fmt(cost)}</span><small class="tx">UPGRADE</small>`}
           </button>
         </div>`;
       }).join('')}
-      <p class="test-note">Skills are permanent upgrades. Win levels to earn coins.</p>`;
+      <p class="note">Skills are permanent. Win levels to earn more coins.</p>`;
     $('#screen-skills').querySelectorAll('[data-skill]').forEach(b => b.addEventListener('click', () => {
       const id = b.dataset.skill;
       const cost = skillCost(save.skills[id]);
@@ -248,43 +336,50 @@ const UI = (() => {
       save.coins -= cost;
       save.skills[id]++;
       persist();
-      renderSkills();
-      renderTop();
+      render('skills');
+      toast(`${SKILLS.find(s => s.id === id).name} Lv ${save.skills[id]}`);
     }));
   }
 
   // ---------- Shop ----------
 
   function renderShop() {
-    const oddsHtml = odds => odds.map((o, i) => o ? `<span style="color:${RARITIES[i].color}">${RARITIES[i].name[0]} ${o}%</span>` : '').join('');
+    const chestStyle = { wood: ['', 'rgba(255,170,80,.7)', ''], silver: ['teal', 'rgba(160,255,240,.7)', ''], gold: ['purple', 'rgba(255,215,90,.85)', 'BEST'] };
+    const odds = o => o.map((p, i) => p ? `<span class="tx" style="color:${RARITIES[i].color}">${RARITIES[i].name.slice(0, 4)} ${p}%</span>` : '').join('');
     $('#screen-shop').innerHTML = `
-      <h2>Shop</h2>
-      <h3>Chests</h3>
+      <div class="ribbon pink"><span class="tx">Shop</span></div>
+      <div class="sub-head"><h3 class="tx">Chests</h3></div>
       <div class="shop-grid">
-        ${CHESTS.map(c => `<div class="panel shop-card">
-          ${icon('chest', c.color, 64)}
-          <div class="title outline">${c.name}</div>
-          <div class="odds">${oddsHtml(c.odds)}</div>
-          <button class="btn ${c.currency === 'gems' ? 'blue' : ''}" data-chest="${c.id}">${icon(c.currency === 'gems' ? 'gem' : 'coin', '', 18)}${fmt(c.price)}</button>
+        ${CHESTS.map(c => {
+          const [cls, glow, flag] = chestStyle[c.id];
+          return `<div class="panel offer ${cls}" style="--glow:${glow}">
+            ${flag ? `<span class="flag tx">${flag}</span>` : ''}
+            <div class="art">${icon('chest', c.color)}</div>
+            <div class="title tx">${c.name}</div>
+            <div class="odds">${odds(c.odds)}</div>
+            <button class="btn ${c.currency === 'gems' ? 'blue' : ''}" data-chest="${c.id}">${icon(c.currency === 'gems' ? 'gem' : 'coin')}<span class="tx">${fmt(c.price)}</span></button>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="sub-head"><h3 class="tx">Coins</h3></div>
+      <div class="shop-grid">
+        ${COIN_PACKS.map((p, i) => `<div class="panel offer orange" style="--glow:rgba(255,230,120,.8)">
+          ${i === 2 ? '<span class="flag tx">+25%</span>' : ''}
+          <div class="art">${icon('coin')}</div>
+          <div class="title tx">${fmt(p.coins)}</div>
+          <button class="btn blue" data-coins="${i}">${icon('gem')}<span class="tx">${p.gems}</span></button>
         </div>`).join('')}
       </div>
-      <h3>Coins</h3>
+      <div class="sub-head"><h3 class="tx">Gems</h3></div>
       <div class="shop-grid">
-        ${COIN_PACKS.map((p, i) => `<div class="panel shop-card">
-          ${icon('coin', '', 48)}
-          <div class="title outline">${fmt(p.coins)} coins</div>
-          <button class="btn blue" data-coins="${i}">${icon('gem', '', 18)}${p.gems}</button>
+        ${GEM_PACKS.map((p, i) => `<div class="panel offer teal" style="--glow:rgba(120,255,200,.8)">
+          <span class="flag tx">TEST</span>
+          <div class="art">${icon('gem')}</div>
+          <div class="title tx">${fmt(p.gems)}</div>
+          <button class="btn green" data-gems="${i}"><span class="tx">FREE</span></button>
         </div>`).join('')}
       </div>
-      <h3>Gems</h3>
-      <div class="shop-grid">
-        ${GEM_PACKS.map((p, i) => `<div class="panel shop-card">
-          ${icon('gem', '', 48)}
-          <div class="title outline">${fmt(p.gems)} gems</div>
-          <button class="btn green" data-gems="${i}">FREE</button>
-        </div>`).join('')}
-      </div>
-      <p class="test-note">Test build: gem packs are free so you can try chests. No real payments.</p>`;
+      <p class="note">Test build: gem packs are free so you can try chests. There are no real payments.</p>`;
 
     const s = $('#screen-shop');
     s.querySelectorAll('[data-chest]').forEach(b => b.addEventListener('click', () => {
@@ -298,40 +393,36 @@ const UI = (() => {
     s.querySelectorAll('[data-coins]').forEach(b => b.addEventListener('click', () => {
       const p = COIN_PACKS[+b.dataset.coins];
       if (save.gems < p.gems) { toast('Not enough gems'); return; }
-      save.gems -= p.gems; save.coins += p.coins; persist(); renderTop(); toast(`+${fmt(p.coins)} coins`);
+      save.gems -= p.gems; save.coins += p.coins; persist(); render('shop'); toast(`+${fmt(p.coins)} coins`);
     }));
     s.querySelectorAll('[data-gems]').forEach(b => b.addEventListener('click', () => {
       const p = GEM_PACKS[+b.dataset.gems];
-      save.gems += p.gems; persist(); renderTop(); toast(`+${fmt(p.gems)} gems`);
+      save.gems += p.gems; persist(); render('shop'); toast(`+${fmt(p.gems)} gems`);
     }));
   }
 
   function chestOpening(chest, after) {
     const item = openChest(chest);
     const rar = RARITIES[item.rarity];
-    modal(`
-      <h2>${chest.name}</h2>
-      <div class="chest-stage" id="chest-stage"><div class="shake">${icon('chest', chest.color, 120)}</div></div>
+    sheet(chest.name, `
+      <div class="rays-wrap" style="--glow:${chest.color}"><div class="rays"></div><div class="shake">${icon('chest', chest.color, 120)}</div></div>
       <p>Opening…</p>`);
     setTimeout(() => {
       const cur = getItem(save.equipped[item.slot]);
       const better = !cur || itemStat(item) > itemStat(cur);
-      modal(`
-        <h2>${chest.name}</h2>
-        <div class="chest-stage" style="--glow:${rar.color}">
-          <div class="chest-rays"></div>
-          <div class="reveal">${itemTile(item, { size: 64, noTag: true })}</div>
-        </div>
-        <div class="rarity-label outline" style="color:${rar.color}">${rar.name}</div>
-        <h2 style="font-size:1.35rem">${itemName(item)}</h2>
-        <div class="item-stat">${slotDef(item.slot).fmt(itemStat(item))}</div>
-        ${better ? '<div class="compare"><span class="up">▲ Better than equipped</span></div>' : ''}
-        <div class="modal-actions">
-          ${better ? '<button class="btn green" id="m-equip">Equip</button>' : ''}
-          <button class="btn" id="m-ok">OK</button>
-        </div>`);
-      $('#m-ok').onclick = () => { closeModal(); render(TAB_IDS[tab]); after && after(); };
-      if (better) $('#m-equip').onclick = () => { equip(item.id); closeModal(); render(TAB_IDS[tab]); toast('Equipped!'); after && after(); };
+      sheet(chest.name, `
+        <div class="rays-wrap" style="--glow:${rar.color}"><div class="rays"></div>${tile(item, { noTag: true, cls: 'big reveal' })}</div>
+        <div class="rarity tx" style="color:${rar.color}">${rar.name}!</div>
+        <div class="item-name tx">${itemName(item)}</div>
+        ${statLine(item)}
+        ${better ? '<span class="delta up tx">▲ Better than what you have on</span>' : ''}
+        <div class="actions">
+          <button class="btn ${better ? 'grey' : ''}" id="m-ok"><span class="tx">OK</span></button>
+          ${better ? '<button class="btn green" id="m-equip"><span class="tx">Equip</span></button>' : ''}
+        </div>`, { ribbon: item.rarity >= 3 ? '' : item.rarity === 2 ? 'purple' : 'blue' });
+      const done = () => { closeModal(); render(TAB_IDS[tab]); after && after(); };
+      $('#m-ok').onclick = done;
+      if (better) $('#m-equip').onclick = () => { equip(item.id); toast('Equipped'); done(); };
     }, 1100);
   }
 
@@ -343,43 +434,49 @@ const UI = (() => {
     return h >>> 0;
   }
 
+  function avatar(p) {
+    const colors = ['#ff8a1f', '#29a8ff', '#4fd645', '#a55cff', '#ffc933', '#ff4d5e', '#2fe0c4', '#ff5fb4'];
+    const faces = ['skull', 'star', 'bolt', 'heart', 'fire', 'target'];
+    const h = hash(p.name);
+    if (p.me) return `<span class="ava" style="background:#ffc933">${icon('helmet', '#3f6b2e')}</span>`;
+    return `<span class="ava" style="background:${colors[h % colors.length]}">${icon(faces[(h >>> 3) % faces.length], '#fff')}</span>`;
+  }
+
   function renderRanks() {
     const bots = BOT_NAMES.map((n, i) => ({ name: n, score: 400 + (hash(n) % 21000) + (i < 5 ? 12000 : 0), me: false }));
-    const me = { name: save.name, score: totalScore(), me: true };
-    const all = [...bots, me].sort((a, b) => b.score - a.score);
-    const colors = ['#ff7a1a', '#3d9bff', '#5dd65d', '#b35cff', '#ffd23a', '#ff4a4a'];
-    const faces = ['☠', '★', '⚡', '♦', '♠', '♥'];
+    const all = [...bots, { name: save.name, score: totalScore(), me: true }].sort((a, b) => b.score - a.score);
+    const meIdx = all.findIndex(p => p.me);
+    const pod = (p, place, cls) => `<div class="pod ${cls}">
+      ${avatar(p)}<span class="nm tx">${p.name}</span><span class="sc tx">${fmt(p.score)}</span>
+      <div class="block tx">${place}</div></div>`;
+    const row = (p, i) => `<div class="rank ${p.me ? 'me' : ''}">
+      <span class="pos tx">${i + 1}</span>${avatar(p)}
+      <span class="nm tx">${p.name}${p.me ? ' (you)' : ''}</span>
+      <span class="sc tx">${icon('ranks', '#ffc933')}${fmt(p.score)}</span>
+    </div>`;
     $('#screen-ranks').innerHTML = `
-      <h2>Leaderboard</h2>
-      <div class="rank-list">
-        ${all.map((p, i) => {
-          const h = hash(p.name);
-          return `<div class="rank ${p.me ? 'me' : ''} ${i < 3 ? 'top' + (i + 1) : ''}">
-            <div class="pos outline">${i + 1}</div>
-            <div class="ava" style="background:${p.me ? '#ffd23a' : colors[h % colors.length]}">${p.me ? '🪖' : faces[h % faces.length]}</div>
-            <div class="nm outline">${p.name}${p.me ? ' (you)' : ''}</div>
-            <div class="sc outline">🏆 ${fmt(p.score)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-      <p class="test-note">Score = sum of your best score on every level. Other players are local test bots.</p>
-      <div class="modal-actions">
-        <button class="btn small" id="rename-btn">Change name</button>
-        <button class="btn small red" id="reset-btn">Reset progress</button>
+      <div class="ribbon blue"><span class="tx">Leaderboard</span></div>
+      <div class="podium">${pod(all[1], 2, 'second')}${pod(all[0], 1, 'first')}${pod(all[2], 3, 'third')}</div>
+      <div class="rank-list">${all.slice(3).map((p, i) => row(p, i + 3)).join('')}${meIdx < 3 ? row(all[meIdx], meIdx) : ''}</div>
+      <p class="note">Your score is the sum of your best score on every level. The other players are local test bots.</p>
+      <div class="actions">
+        <button class="btn small blue" id="rename-btn"><span class="tx">Change name</span></button>
+        <button class="btn small red" id="reset-btn"><span class="tx">Reset progress</span></button>
       </div>`;
     $('#rename-btn').onclick = rename;
     $('#reset-btn').onclick = () => {
-      modal(`<h2>Reset?</h2><p>This wipes all coins, gear and progress on this device.</p>
-        <div class="modal-actions"><button class="btn grey" id="m-no">Cancel</button><button class="btn red" id="m-yes">Reset</button></div>`);
+      sheet('Reset?', `<p>This deletes all coins, gear and level progress on this device.</p>
+        <div class="actions"><button class="btn grey" id="m-no"><span class="tx">Cancel</span></button><button class="btn red" id="m-yes"><span class="tx">Reset</span></button></div>`, { ribbon: 'red' });
       $('#m-no').onclick = closeModal;
       $('#m-yes').onclick = () => { resetSave(); selectedLevel = 0; closeModal(); setTab(2); toast('Progress reset'); };
     };
   }
 
   function rename() {
-    modal(`<h2>Your name</h2><input class="name-input" id="m-name" maxlength="14" value="${save.name.replace(/"/g, '')}">
-      <div class="modal-actions"><button class="btn grey" id="m-no">Cancel</button><button class="btn green" id="m-yes">Save</button></div>`);
+    sheet('Your name', `<input class="name-input" id="m-name" maxlength="14" aria-label="Your name">
+      <div class="actions"><button class="btn grey" id="m-no"><span class="tx">Cancel</span></button><button class="btn green" id="m-yes"><span class="tx">Save</span></button></div>`, { ribbon: 'blue' });
     const input = $('#m-name');
+    input.value = save.name;
     input.focus(); input.select();
     $('#m-no').onclick = closeModal;
     $('#m-yes').onclick = () => {
@@ -393,19 +490,20 @@ const UI = (() => {
   // ---------- Level flow ----------
 
   function startLevel(i) {
-    stopHero();
+    stopScene();
     paused = false;
+    closeModal();
     $('#game-view').hidden = false;
     const hint = $('#hud-hint');
     hint.style.animation = 'none'; void hint.offsetWidth; hint.style.animation = '';
     Game.start(i, onLevelEnd);
   }
 
-  function exitLevel() {
+  function leaveGame(toTab = 2) {
     Game.quit();
     closeModal();
     $('#game-view').hidden = true;
-    setTab(2);
+    setTab(toTab);
   }
 
   function togglePause(forceOn) {
@@ -418,17 +516,16 @@ const UI = (() => {
     if (paused) return;
     paused = true;
     Game.pause();
-    modal(`<h2>Paused</h2>
-      <div class="modal-actions"><button class="btn red" id="m-quit">Quit</button><button class="btn green" id="m-resume">Resume</button></div>`);
+    sheet('Paused', `<p>Take a breather. The horde will wait.</p>
+      <div class="actions"><button class="btn red" id="m-quit"><span class="tx">Quit</span></button><button class="btn green" id="m-resume"><span class="tx">Resume</span></button></div>`, { ribbon: 'blue' });
     $('#m-resume').onclick = () => togglePause();
-    $('#m-quit').onclick = exitLevel;
+    $('#m-quit').onclick = () => leaveGame();
   }
 
   function onLevelEnd(res) {
     const pr = progress();
     const firstClear = res.win && pr.stars[res.lvlIdx] === 0;
-    let gems = 0;
-    let chest = null;
+    let gems = 0, chest = null;
     if (res.win) {
       pr.stars[res.lvlIdx] = Math.max(pr.stars[res.lvlIdx], res.stars);
       pr.unlocked = Math.max(pr.unlocked, Math.min(res.lvlIdx + 2, 6));
@@ -437,36 +534,67 @@ const UI = (() => {
         chest = CHAPTERS[0].levels[res.lvlIdx].boss.final ? CHESTS[2] : CHESTS[0];
       }
     }
-    const newBest = res.score > pr.best[res.lvlIdx];
-    pr.best[res.lvlIdx] = Math.max(pr.best[res.lvlIdx], res.score);
+    const prevBest = pr.best[res.lvlIdx];
+    pr.best[res.lvlIdx] = Math.max(prevBest, res.score);
     save.coins += res.coins;
     save.gems += gems;
     persist();
+    paused = true; // ignore pause toggles while the result is up
 
-    const starSvg = [0, 1, 2].map(i => icon('star', i < res.stars ? '#ffd23a' : '#4a505e', 54)).join('');
     const final = res.win && CHAPTERS[0].levels[res.lvlIdx].boss.final;
-    modal(`
-      <h2 style="color:${res.win ? '#ffd23a' : '#ff6a6a'}">${final ? 'CHAPTER CLEAR!' : res.win ? 'VICTORY!' : 'DEFEATED'}</h2>
-      ${res.win ? `<div class="result-stars">${starSvg}</div>` : '<p>The horde got you. Upgrade skills or gear and try again!</p>'}
-      <p>Kills ${res.kills} · Score ${fmt(res.score)}${newBest ? ' · <span style="color:#8ef08e">New best!</span>' : ''}</p>
-      <div class="rewards">
-        <div class="reward">${icon('coin', '', 22)} +${fmt(res.coins)}</div>
-        ${gems ? `<div class="reward">${icon('gem', '', 22)} +${gems}</div>` : ''}
-        ${chest ? `<div class="reward">${icon('chest', chest.color, 22)} ${chest.name}</div>` : ''}
-      </div>
-      <div class="modal-actions">
-        ${chest ? '<button class="btn blue" id="m-chest">Open chest</button>' : ''}
-        <button class="btn grey" id="m-home">Home</button>
-        ${res.win && res.lvlIdx < 5 ? '<button class="btn green" id="m-next">Next</button>' : '<button class="btn green" id="m-retry">Retry</button>'}
-      </div>`);
+    const newBest = res.score > prevBest;
+    const rewards = `<div class="rewards">
+      <div class="reward">${icon('coin')}<span class="tx">+${fmt(res.coins)}</span></div>
+      ${gems ? `<div class="reward">${icon('gem')}<span class="tx">+${gems}</span></div>` : ''}
+      ${chest ? `<div class="reward">${icon('chest', chest.color)}<span class="tx">x1</span></div>` : ''}
+    </div>`;
+    const stats = `<div class="result-stats">
+      <div><small>Kills</small><b class="tx">${res.kills}</b></div>
+      <div><small>Score</small><b class="tx">${fmt(res.score)}</b></div>
+      <div><small>${newBest ? 'New best!' : 'Best'}</small><b class="tx" style="color:${newBest ? '#b4ffa8' : '#fff'}">${fmt(pr.best[res.lvlIdx])}</b></div>
+    </div>`;
 
-    const home = () => { closeModal(); $('#game-view').hidden = true; setTab(2); };
-    $('#m-home').onclick = home;
-    const next = $('#m-next'), retry = $('#m-retry');
-    if (next) next.onclick = () => { closeModal(); selectedLevel = res.lvlIdx + 1; startLevel(selectedLevel); };
-    if (retry) retry.onclick = () => { closeModal(); startLevel(res.lvlIdx); };
-    if (chest) $('#m-chest').onclick = () => {
-      // Chest was earned, not bought: open it free, then return home.
+    if (res.win) {
+      const stars = [0, 1, 2].map(i => icon('star', i < res.stars ? '#ffc933' : '#2a2f6e')).join('');
+      sheet(final ? 'Chapter clear!' : 'Victory!', `
+        <div class="rays-wrap"><div class="rays"></div><div class="stars">${stars}</div></div>
+        ${stats}${rewards}
+        <div class="actions">
+          <button class="btn grey" id="m-home"><span class="tx">Home</span></button>
+          ${chest ? '<button class="btn blue" id="m-chest"><span class="tx">Open chest</span></button>'
+                  : res.lvlIdx < 5 ? '<button class="btn green" id="m-next"><span class="tx">Next</span></button>'
+                  : '<button class="btn green" id="m-retry"><span class="tx">Replay</span></button>'}
+        </div>`);
+    } else {
+      const pct = Math.round(Math.min(1, res.reached) * 100);
+      sheet('Defeated', `
+        <canvas class="result-art" id="m-art" width="300" height="260"></canvas>
+        <div class="reach">
+          <div class="reach-track"><div class="reach-fill" style="width:${pct}%"></div></div>
+          <small>${res.reached >= 1 ? 'You reached the boss!' : `You made it ${pct}% of the way.`}</small>
+        </div>
+        ${stats}${rewards}
+        <p>Get stronger, then try again:</p>
+        <div class="tips">
+          <button class="btn small green" id="m-skills">${icon('skills', '#fff')}<span class="tx">Skills</span></button>
+          <button class="btn small purple" id="m-gear">${icon('gear', '#fff')}<span class="tx">Gear</span></button>
+        </div>
+        <div class="actions">
+          <button class="btn grey" id="m-home"><span class="tx">Home</span></button>
+          <button class="btn" id="m-retry"><span class="tx">Retry</span></button>
+        </div>`, { ribbon: 'red', cls: 'defeat' });
+      drawZombie($('#m-art').getContext('2d'), 150, 250, 230, 0.4, { color: '#f28a3c', shirt: '#6b4fb8' });
+      $('#m-skills').onclick = () => leaveGame(3);
+      $('#m-gear').onclick = () => leaveGame(1);
+    }
+
+    $('#m-home').onclick = () => leaveGame();
+    const next = $('#m-next'), retry = $('#m-retry'), ch = $('#m-chest');
+    if (next) next.onclick = () => { selectedLevel = res.lvlIdx + 1; startLevel(selectedLevel); };
+    if (retry) retry.onclick = () => startLevel(res.lvlIdx);
+    if (ch) ch.onclick = () => {
+      // Earned chests open for free, then return to the menu.
+      Game.quit();
       $('#game-view').hidden = true;
       chestOpening(chest, () => setTab(2));
     };
@@ -476,24 +604,22 @@ const UI = (() => {
   // ---------- Init ----------
 
   function init() {
+    const colors = { shop: '#ff5fb4', gear: '#5d8f46', play: '#ff8a1f', skills: '#ffc933', ranks: '#ffc933', heart: '#ff4d5e', skull: '#ffffff' };
     document.querySelectorAll('[data-icon]').forEach(el => {
-      const target = el.tagName === 'BUTTON' ? el.querySelector('i') : el;
-      const size = el.classList.contains('center') ? 40 : el.tagName === 'BUTTON' ? 32 : 22;
-      const colors = { shop: '#ffd23a', gear: '#5d8f46', play: '#ff7a1a', skills: '#ffd23a', ranks: '#ffd23a' };
-      target.innerHTML = icon(el.dataset.icon, colors[el.dataset.icon] || '#ffd23a', size);
+      const target = el.classList.contains('tab') ? el.querySelector('i') : el;
+      target.innerHTML = icon(el.dataset.icon, colors[el.dataset.icon] || '#ffc933');
     });
-    $('#hud-pause').innerHTML = icon('pause', '', 22);
+    $('#hud-pause').innerHTML = icon('pause');
     $('#hud-pause').addEventListener('click', () => togglePause());
-    document.querySelectorAll('.navbar button').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
+    document.querySelectorAll('.navbar .tab').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
+    document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.goto)));
     $('#profile-btn').addEventListener('click', rename);
     $('#modal').addEventListener('click', e => {
-      // Tapping the backdrop closes simple modals (not results/pause).
       if (e.target.id === 'modal' && $('#m-close')) closeModal();
     });
     selectedLevel = Math.max(0, progress().unlocked - 1);
     Game.init();
     setTab(2);
-    // Redraw once the game font has loaded.
     if (document.fonts) document.fonts.ready.then(() => render(TAB_IDS[tab]));
   }
 

@@ -133,13 +133,14 @@ const Game = (() => {
     cancelAnimationFrame(raf);
     const cb = onEnd;
     run = null;
-    cb({ win, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score });
+    cb({ win, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, reached: r.dist / r.cfg.length });
   }
 
-  function showBanner(text, dur, boss = false) {
+  function showBanner(text, dur, kind = '') {
     run.banner = { text, t: dur };
     hud.banner.innerHTML = `<svg class="warn-sign" viewBox="0 0 80 70"><path d="M40 4 76 66H4z" fill="#fff" stroke="#1b1f2a" stroke-width="4" stroke-linejoin="round"/><path d="M40 17 65 60H15z" fill="#e0242c"/><rect x="36" y="28" width="8" height="18" rx="3" fill="#fff"/><circle cx="40" cy="52" r="4" fill="#fff"/></svg><div class="warn-text">${text}</div>`;
-    hud.banner.classList.toggle('boss', boss);
+    hud.banner.classList.toggle('boss', kind === 'boss');
+    hud.banner.classList.toggle('good', kind === 'good');
     hud.banner.hidden = false;
     hud.banner.classList.remove('show'); void hud.banner.offsetWidth; hud.banner.classList.add('show');
   }
@@ -148,7 +149,13 @@ const Game = (() => {
 
   function spawnProp(z) {
     const side = Math.random() < 0.5 ? -1 : 1;
-    run.props.push({ x: side * rand(1.25, 1.9), z, kind: pick(['cone', 'crate', 'tires', 'cone']), h: rand(0.22, 0.34) });
+    const kind = pick(['cone', 'crate', 'tires', 'hydrant', 'bush', 'bush', 'car']);
+    const far = kind === 'car' || kind === 'bush';
+    run.props.push({
+      x: side * (far ? rand(2.05, 2.6) : rand(1.3, 1.8)), z, kind,
+      h: kind === 'car' ? rand(0.32, 0.4) : kind === 'bush' ? rand(0.3, 0.45) : rand(0.22, 0.32),
+      color: pick(['#ff4d5e', '#29a8ff', '#ffc933', '#a55cff', '#4fd645', '#ff8a1f']),
+    });
   }
 
   function zombieType() {
@@ -165,7 +172,7 @@ const Game = (() => {
     run.zombies.push({
       type, x, z, hp, maxHp: hp, speed: zt.speed * rand(0.85, 1.15), size: zt.size,
       color: zt.color, score: zt.score, flash: 0, t: Math.random() * 10,
-      shirt: pick(['#6b6f9a', '#4f7fa8', '#8a6a9a', '#7a8a5a']),
+      shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
     });
   }
 
@@ -226,7 +233,7 @@ const Game = (() => {
     run.bossSummon = 4;
     hud.bossName.textContent = b.name;
     hud.boss.hidden = false;
-    showBanner(b.final ? 'FINAL BOSS' : 'BOSS INCOMING', 2.2, true);
+    showBanner(b.final ? 'FINAL BOSS' : 'BOSS INCOMING', 2.2, 'boss');
   }
 
   // ---------- Update ----------
@@ -274,7 +281,7 @@ const Game = (() => {
     while (r.nextProp < r.dist + Z_FAR) { spawnProp(r.nextProp - r.dist); r.nextProp += rand(2.5, 5); }
 
     for (const p of r.props) p.z -= move;
-    r.props = r.props.filter(p => p.z > -CAM_D + 1);
+    r.props = r.props.filter(p => p.z > -CAM_D + 0.5);
 
     // Firing
     r.fireCd -= dt;
@@ -373,7 +380,8 @@ const Game = (() => {
     if (r.zombies.includes(t)) {
       r.zombies.splice(r.zombies.indexOf(t), 1);
       r.kills++;
-      burst(t.x, t.z, t.color, 8);
+      burst(t.x, t.z, t.color, 7);
+      burst(t.x, t.z, pick(['#ffe14d', '#ff5fb4', '#2fe0c4', '#8fd2ff']), 4);
     } else if (r.barrels.includes(t)) {
       r.barrels.splice(r.barrels.indexOf(t), 1);
       burst(t.x, t.z, '#ff5a3a', 18);
@@ -387,7 +395,7 @@ const Game = (() => {
       r.rocks = [];
       r.state = 'ending';
       r.endTimer = 1.4;
-      showBanner('BOSS DEFEATED', 1.4);
+      showBanner('BOSS DEFEATED', 1.4, 'good');
     }
   }
 
@@ -546,52 +554,69 @@ const Game = (() => {
 
   // ---------- Drawing ----------
 
+  function quad(x1, z1, x2, z2, color) {
+    const a = proj(x1, z1), b = proj(x2, z1), c = proj(x2, z2), d = proj(x1, z2);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.fill();
+  }
+
   function drawGround() {
     const r = run;
-    // Outer concrete
-    ctx.fillStyle = '#8b929c';
-    ctx.fillRect(0, 0, W, H);
+    const zNear = -CAM_D + 0.6;
+    const far = proj(0, Z_FAR).y;
 
-    // Scrolling tile lines on the sidewalks
-    ctx.strokeStyle = 'rgba(40,44,52,.25)';
-    ctx.lineWidth = 1.5;
-    const off = r.dist % 2;
-    for (let k = 0; k < 24; k++) {
-      const z = k * 2 - off;
-      const p = proj(0, z);
-      ctx.beginPath(); ctx.moveTo(0, p.y); ctx.lineTo(W, p.y); ctx.stroke();
+    // Park grass with scrolling mow stripes
+    ctx.fillStyle = '#48b83e';
+    ctx.fillRect(0, far, W, H - far);
+    const gOff = r.dist % 4;
+    for (let z = -gOff - 4; z < Z_FAR; z += 4) {
+      quad(-12, Math.max(z, zNear), 12, Math.max(z + 2, zNear), '#56c94a');
     }
-    for (const x of [-2.6, -2.1, -1.6, 1.6, 2.1, 2.6]) {
-      const a = proj(x, -2), b = proj(x, Z_FAR);
+
+    // Sidewalks with tiles
+    for (const s of [-1, 1]) {
+      quad(s * 1.08, zNear, s * 1.95, Z_FAR, '#98a4ef');
+      ctx.strokeStyle = 'rgba(255,255,255,.35)';
+      ctx.lineWidth = 1.5;
+      const tOff = r.dist % 1;
+      for (let z = -tOff; z < Z_FAR; z += 1) {
+        const a = proj(s * 1.08, z), b = proj(s * 1.95, z);
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+      const a = proj(s * 1.52, zNear), b = proj(s * 1.52, Z_FAR);
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      // Grass edge line
+      const e1 = proj(s * 1.95, zNear), e2 = proj(s * 1.95, Z_FAR);
+      ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(e1.x, e1.y); ctx.lineTo(e2.x, e2.y); ctx.stroke();
     }
 
     // Road
-    const zNear = -CAM_D + 0.6;
-    const nl = proj(-ROAD, zNear), nr = proj(ROAD, zNear), fl = proj(-ROAD, Z_FAR), fr = proj(ROAD, Z_FAR);
-    ctx.fillStyle = '#5b616b';
-    ctx.beginPath(); ctx.moveTo(nl.x, nl.y); ctx.lineTo(fl.x, fl.y); ctx.lineTo(fr.x, fr.y); ctx.lineTo(nr.x, nr.y); ctx.fill();
+    quad(-ROAD, zNear, ROAD, Z_FAR, '#4a4d86');
+    quad(-ROAD, zNear, -ROAD + 0.12, Z_FAR, 'rgba(0,0,0,.12)');
+    quad(ROAD - 0.12, zNear, ROAD, Z_FAR, 'rgba(0,0,0,.12)');
 
-    // Curbs
+    // Red/white striped curbs
+    const cOff = r.dist % 1.2;
     for (const s of [-1, 1]) {
-      const a = proj(s * ROAD, zNear), b = proj(s * ROAD, Z_FAR), c = proj(s * (ROAD + 0.1), Z_FAR), d = proj(s * (ROAD + 0.1), zNear);
-      ctx.fillStyle = '#d7dbe0';
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.fill();
-      ctx.strokeStyle = '#1b1f2a'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+      for (let z = -cOff - 1.2; z < Z_FAR; z += 1.2) {
+        const z1 = Math.max(z, zNear), z2 = Math.max(z + 0.6, zNear), z3 = Math.max(z + 1.2, zNear);
+        quad(s * ROAD, z1, s * 1.08, z2, '#ff4d5e');
+        quad(s * ROAD, z2, s * 1.08, z3, '#ffffff');
+      }
+      const a = proj(s * ROAD, zNear), b = proj(s * ROAD, Z_FAR);
+      ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
     }
 
-    // Dashed center line
-    ctx.fillStyle = '#f2f2f2';
+    // Dashed yellow center line
     const dash = 3, off2 = r.dist % dash;
     for (let z = -off2 - CAM_D + 1; z < Z_FAR; z += dash) {
-      const a = proj(-0.03, Math.max(z, zNear)), b = proj(0.03, Math.max(z, zNear));
-      const c = proj(0.03, z + 1.4), d = proj(-0.03, z + 1.4);
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.fill();
+      quad(-0.035, Math.max(z, zNear), 0.035, Math.max(z + 1.4, zNear), '#ffd35a');
     }
 
-    // Cracks for texture
-    ctx.strokeStyle = 'rgba(20,22,28,.35)';
+    // Cracks and paint splats for texture
+    ctx.strokeStyle = 'rgba(20,19,43,.4)';
     ctx.lineWidth = 1.5;
     const coff = r.dist % 9;
     for (let k = 0; k < 6; k++) {
@@ -601,12 +626,16 @@ const Game = (() => {
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.stroke();
     }
 
-    // Distance fog at the top
-    const g = ctx.createLinearGradient(0, 0, 0, H * 0.22);
-    g.addColorStop(0, 'rgba(46,50,60,1)');
-    g.addColorStop(1, 'rgba(46,50,60,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H * 0.22);
+    // Sunset sky at the far end
+    const sky = ctx.createLinearGradient(0, 0, 0, far + 2);
+    sky.addColorStop(0, '#5a3fd6'); sky.addColorStop(0.6, '#ff6fae'); sky.addColorStop(1, '#ffc46b');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, far + 2);
+    const haze = ctx.createLinearGradient(0, far, 0, far + H * 0.12);
+    haze.addColorStop(0, 'rgba(255,196,107,.85)');
+    haze.addColorStop(1, 'rgba(255,196,107,0)');
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, far, W, H * 0.12);
   }
 
   function draw() {
@@ -645,11 +674,15 @@ const Game = (() => {
     // Bullets
     for (const b of r.bullets) {
       const p = proj(b.x, b.z), q = proj(b.x, b.z - 0.8);
-      ctx.strokeStyle = '#ffe14d';
       ctx.lineCap = 'round';
-      ctx.lineWidth = Math.max(2, 7 * p.s);
       const hy = 0.45 * roadW;
-      ctx.beginPath(); ctx.moveTo(q.x, q.y - hy * q.s); ctx.lineTo(p.x, p.y - hy * p.s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(q.x, q.y - hy * q.s); ctx.lineTo(p.x, p.y - hy * p.s);
+      ctx.strokeStyle = r.rage > 0 ? 'rgba(255,90,40,.55)' : 'rgba(255,150,40,.5)';
+      ctx.lineWidth = Math.max(4, 14 * p.s);
+      ctx.stroke();
+      ctx.strokeStyle = r.rage > 0 ? '#ffd0a0' : '#fff6a0';
+      ctx.lineWidth = Math.max(2, 6 * p.s);
+      ctx.stroke();
     }
 
     // Rocks in flight
@@ -707,6 +740,9 @@ const Game = (() => {
     const h = p.h * roadW * q.s;
     if (p.kind === 'cone') drawCone(ctx, q.x, q.y, h);
     else if (p.kind === 'crate') drawCrate(ctx, q.x, q.y, h);
+    else if (p.kind === 'hydrant') drawHydrant(ctx, q.x, q.y, h);
+    else if (p.kind === 'bush') drawBush(ctx, q.x, q.y, h);
+    else if (p.kind === 'car') drawCar(ctx, q.x, q.y, h, p.color);
     else drawTires(ctx, q.x, q.y, h);
   }
 
@@ -754,17 +790,19 @@ const Game = (() => {
     if (!r) return;
     const pct = Math.max(0, r.hp / r.maxHp);
     hud.hpFill.style.width = `${pct * 100}%`;
+    hud.hpFill.classList.toggle('low', pct < 0.3);
     hud.hpText.textContent = `${Math.ceil(Math.max(0, r.hp))}`;
     hud.prog.style.width = `${Math.min(1, r.dist / r.cfg.length) * 100}%`;
     hud.kills.textContent = r.kills;
     if (r.boss) hud.bossFill.style.width = `${Math.max(0, r.boss.hp / r.boss.maxHp) * 100}%`;
 
     const chips = [];
-    if (r.shots > 1) chips.push(`<span class="chip">x${r.shots} GUNS</span>`);
-    if (Math.abs(r.dmgMult - 1) > 0.01) chips.push(`<span class="chip ${r.dmgMult < 1 ? 'bad' : ''}">DMG ${Math.round(r.dmgMult * 100)}%</span>`);
-    if (Math.abs(r.rateMult - 1) > 0.01) chips.push(`<span class="chip ${r.rateMult < 1 ? 'bad' : ''}">FIRE ${Math.round(r.rateMult * 100)}%</span>`);
-    if (r.shield > 0) chips.push(`<span class="chip blue">SHIELD ${Math.ceil(r.shield)}</span>`);
-    if (r.rage > 0) chips.push(`<span class="chip orange">RAGE ${Math.ceil(r.rage)}</span>`);
+    const chip = (cls, ic, color, text) => chips.push(`<span class="buff tx ${cls}">${icon(ic, color, 18)}${text}</span>`);
+    if (r.shots > 1) chip('guns', 'rifle', '#fff', `x${r.shots}`);
+    if (Math.abs(r.dmgMult - 1) > 0.01) chip(r.dmgMult < 1 ? 'bad' : '', 'burst', '#ff8a1f', `${Math.round(r.dmgMult * 100)}%`);
+    if (Math.abs(r.rateMult - 1) > 0.01) chip(r.rateMult < 1 ? 'bad' : '', 'fire', '#ffc933', `${Math.round(r.rateMult * 100)}%`);
+    if (r.shield > 0) chip('shield', 'helmet', '#8fd2ff', `${Math.ceil(r.shield)}s`);
+    if (r.rage > 0) chip('rage', 'fire', '#ff4d5e', `${Math.ceil(r.rage)}s`);
     const html = chips.join('');
     if (html !== lastBuffs) { hud.buffs.innerHTML = html; lastBuffs = html; }
   }

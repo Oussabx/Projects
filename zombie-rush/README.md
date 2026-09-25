@@ -40,3 +40,5 @@ Progress is saved in the browser's localStorage. You can wipe it from the Ranks 
 | `js/ui.js` | Menus, navbar, modals, rewards |
 
 Add chapters by appending to `CHAPTERS` in `js/data.js`.
+
+The game font is Lilita One (SIL Open Font License), bundled in `fonts/` so it also works offline.
