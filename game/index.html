@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bubble Pup</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="hud">
+      <div class="stat"><span>Score</span><strong id="score">0</strong></div>
+      <div class="stat"><span>Lives</span><strong id="lives">❤❤❤</strong></div>
+      <div class="stat"><span>Best</span><strong id="best">0</strong></div>
+      <button id="pause" class="icon-btn" aria-label="Pause">❚❚</button>
+    </header>
+
+    <div class="stage">
+      <canvas id="game" aria-label="Bubble Pup game"></canvas>
+
+      <div id="overlay" class="overlay">
+        <div class="card">
+          <h1 id="title">Bubble Pup</h1>
+          <p id="message">Catch the bubbles to get the pup squeaky clean.<br>Golden bones are worth 5. Dodge the mud!</p>
+          <button id="start" class="btn">Play</button>
+          <p class="hint">← → or A / D to move · drag on touch · P to pause</p>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
