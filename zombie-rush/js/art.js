@@ -115,7 +115,7 @@ function drawSoldierFront(ctx, cx, footY, height, t = 0) {
   ctx.restore();
 }
 
-function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0) {
+function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0, weapon = 'rifle') {
   const u = height / 100;
   const step = Math.sin(t * 14);
   ctx.save();
@@ -155,14 +155,16 @@ function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0) {
   ctx.fillStyle = 'rgba(255,255,255,.4)';
   ctx.beginPath(); ctx.ellipse(-9, -88, 8, 4, -0.4, 0, Math.PI * 2); ctx.fill();
 
-  // Rifle pointing forward (up the screen)
-  rr(ctx, 18, -100, 9, 44, 3); blob(ctx, '#2a2d33', lw);
-  rr(ctx, 20, -110, 5, 12, 2); blob(ctx, '#2a2d33', lw);
-  rr(ctx, 16, -72, 13, 10, 3); blob(ctx, '#7a4a28', lw);
+  // Weapon held on the right shoulder, pointing forward (up the screen)
+  const big = weapon === 'minigun' || weapon === 'rocket';
+  const wl = big ? 78 : weapon === 'sniper' ? 70 : weapon === 'smg' ? 46 : 60;
+  const wx = big ? 20 : 22;
+  drawWeaponSide(ctx, weapon, wx, -72 - wl * 0.25, wl, { rot: -Math.PI / 2 });
+  const tipY = -72 - wl * 0.25 - wl * 0.52;
 
   if (flash > 0) {
     ctx.save();
-    ctx.translate(22.5, -116);
+    ctx.translate(wx, tipY - 4);
     ctx.fillStyle = '#ffe14d';
     ctx.beginPath();
     for (let i = 0; i < 10; i++) {
@@ -513,6 +515,60 @@ function drawTrooper(ctx, cx, footY, height, t, opts = {}) {
   ctx.restore();
 }
 
+// Side view of each weapon, pointing right, centered on (cx, cy); len = overall length.
+function drawWeaponSide(ctx, kind, cx, cy, len, opts = {}) {
+  const L = len / 100;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (opts.rot) ctx.rotate(opts.rot);
+  ctx.scale(L, L);
+  const lw = 3.2;
+  const dark = '#2a2d38', wood = '#8a5530', metal = '#5b6070';
+  const glow = opts.accent;
+  const R = (x, y, w, h, r, c) => { rr(ctx, x, y, w, h, r); blob(ctx, c, lw); };
+  if (kind === 'smg') {
+    R(-30, -10, 52, 18, 4, dark); R(20, -5, 22, 7, 2, metal); R(-6, 6, 10, 26, 3, dark); R(-26, 6, 10, 16, 3, dark);
+    R(-44, -6, 16, 8, 3, metal);
+  } else if (kind === 'shotgun') {
+    R(-50, -4, 26, 16, 6, wood); R(-26, -9, 40, 15, 3, dark); R(12, -8, 40, 8, 3, metal); R(10, 0, 30, 8, 3, wood);
+    R(-20, 6, 8, 12, 3, dark);
+  } else if (kind === 'sniper') {
+    R(-52, -4, 28, 14, 6, wood); R(-26, -8, 38, 14, 3, '#3f5f4a'); R(10, -5, 44, 6, 2, metal);
+    R(-18, -24, 30, 11, 5, dark); ctx.fillStyle = '#8fd2ff'; ctx.fillRect(9, -22, 3, 7);
+    R(-14, 6, 8, 12, 3, dark); R(28, 1, 3, 14, 1, dark);
+  } else if (kind === 'minigun') {
+    R(-44, -16, 40, 32, 8, '#e0b43a'); R(-50, -6, 10, 26, 4, dark);
+    for (const y of [-10, -2, 6]) R(-6, y - 3, 56, 7, 3, metal);
+    R(46, -14, 8, 28, 3, dark); R(-30, 14, 12, 18, 4, dark);
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-40, -12, 30, 5);
+  } else if (kind === 'rocket') {
+    R(-50, -11, 84, 22, 9, '#4f8a3a'); R(-54, -13, 10, 26, 4, dark); R(30, -13, 8, 26, 3, dark);
+    ctx.beginPath(); ctx.moveTo(38, -10); ctx.lineTo(56, 0); ctx.lineTo(38, 10); ctx.closePath(); blob(ctx, '#e0303a', lw);
+    R(-18, 10, 9, 18, 3, dark); R(0, 10, 9, 14, 3, dark);
+    ctx.fillStyle = '#ffd23a'; ctx.fillRect(-30, -3, 40, 6);
+  } else {
+    // Assault rifle
+    R(-50, -4, 24, 14, 5, wood); R(-26, -9, 44, 16, 4, dark); R(16, -5, 30, 7, 2, metal); R(44, -8, 5, 13, 2, dark);
+    R(-2, 6, 10, 20, 3, dark); ctx.save(); ctx.translate(8, 8); ctx.rotate(0.25); R(0, 0, 10, 20, 3, dark); ctx.restore();
+    R(-14, -16, 18, 7, 3, dark);
+  }
+  if (glow) {
+    ctx.strokeStyle = glow; ctx.lineWidth = 2.5; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.moveTo(-24, -1); ctx.lineTo(8, -1); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawRocketShot(ctx, x, y, s, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(255,170,60,.6)';
+  ctx.beginPath(); ctx.ellipse(0, s * 1.2, s * 0.35, s * (0.9 + Math.sin(t * 40) * 0.2), 0, 0, Math.PI * 2); ctx.fill();
+  rr(ctx, -s * 0.28, -s * 0.5, s * 0.56, s * 1.3, s * 0.2); blob(ctx, '#e8e8f0', Math.max(1, s / 8));
+  ctx.beginPath(); ctx.moveTo(-s * 0.28, -s * 0.5); ctx.lineTo(0, -s * 1.05); ctx.lineTo(s * 0.28, -s * 0.5); ctx.closePath(); blob(ctx, '#e0303a', Math.max(1, s / 8));
+  ctx.restore();
+}
+
 // Gatling gun reward (drawn on top of barrels).
 function drawGatling(ctx, cx, cy, s, t) {
   ctx.save();
@@ -593,6 +649,11 @@ const ICONS = {
   sound: c => `<path d="M8 24h12l14-12v40L20 40H8z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><path d="M42 22c4 5 4 15 0 20M49 15c8 9 8 25 0 34" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/>`,
   mute: () => `<path d="M8 24h12l14-12v40L20 40H8z" fill="#fff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><path d="M42 24l14 16M56 24 42 40" stroke="${INK}" stroke-width="6" stroke-linecap="round"/>`,
   back: () => `<path d="M28 10 8 30l20 20V38c12 0 20 4 26 14 0-16-8-28-26-28z" fill="#fff" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>`,
+  smg: c => `<rect x="10" y="22" width="34" height="14" rx="3" fill="${c}" stroke="${INK}" stroke-width="4"/><rect x="42" y="26" width="14" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="24" y="34" width="8" height="20" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/><rect x="12" y="34" width="8" height="12" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/>`,
+  shotgun: c => `<path d="M4 34l14-8h40v8H24l-4 10H8z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><rect x="30" y="34" width="18" height="7" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/>`,
+  sniper: c => `<path d="M4 36l12-6h46v5H24l-4 9H6z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><rect x="20" y="16" width="20" height="9" rx="4" fill="${c}" stroke="${INK}" stroke-width="4"/><path d="M26 25v5M34 25v5" stroke="${INK}" stroke-width="3"/>`,
+  minigun: c => `<rect x="6" y="18" width="26" height="26" rx="6" fill="${c}" stroke="${INK}" stroke-width="4"/><rect x="30" y="20" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="30" y="28" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="30" y="36" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="14" y="42" width="8" height="14" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/>`,
+  rocket: c => `<rect x="4" y="24" width="44" height="16" rx="7" fill="${c}" stroke="${INK}" stroke-width="4"/><path d="M46 22l14 10-14 10z" fill="#ff4d5e" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><rect x="16" y="38" width="8" height="14" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/>`,
   pause: () => `<rect x="14" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/><rect x="38" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/>`,
 };
 

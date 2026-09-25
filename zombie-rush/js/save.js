@@ -10,9 +10,10 @@ function defaultSave() {
     gems: 150,
     skills: { hp: 0, dmg: 0, rate: 0, crit: 0 },
     inventory: [
-      { id: 1, slot: 'rifle', rarity: 0, roll: 1 },
-      { id: 2, slot: 'helmet', rarity: 0, roll: 1 },
+      { id: 1, slot: 'rifle', rarity: 0, roll: 1, kind: 'rifle', lvl: 1 },
+      { id: 2, slot: 'helmet', rarity: 0, roll: 1, lvl: 1 },
     ],
+    freeChestAt: 0,
     equipped: { helmet: 2, rifle: 1, gloves: null, scope: null },
     nextId: 3,
     settings: { music: 0.5, sfx: 0.8, muted: false },
@@ -36,6 +37,8 @@ function loadSave() {
       data.progress = Object.assign(defaultSave().progress, data.progress);
       data.settings = Object.assign(defaultSave().settings, data.settings);
       data.chests = data.chests || [];
+      data.inventory.forEach(i => { if (i.slot === 'rifle' && !i.kind) i.kind = 'rifle'; if (!i.lvl) i.lvl = 1; });
+      if (data.freeChestAt === undefined) data.freeChestAt = 0;
       return data;
     }
   } catch { /* storage unavailable or corrupt: start fresh */ }
@@ -55,11 +58,28 @@ function resetSave() {
 
 function itemStat(item) {
   const slot = SLOTS.find(s => s.id === item.slot);
-  return slot.base * RARITIES[item.rarity].mult * item.roll;
+  return slot.base * RARITIES[item.rarity].mult * item.roll * (1 + 0.15 * ((item.lvl || 1) - 1));
 }
 
 function itemName(item) {
+  if (item.slot === 'rifle') return `${RARITY_PREFIX[item.rarity]} ${WEAPONS[item.kind || 'rifle'].name}`;
   return GEAR_NAMES[item.slot][item.rarity];
+}
+
+function upgradeItem(id) {
+  const item = getItem(id);
+  if (!item || (item.lvl || 1) >= GEAR_MAX_LVL) return false;
+  const cost = gearUpgradeCost(item);
+  if (save.coins < cost) return false;
+  save.coins -= cost;
+  item.lvl = (item.lvl || 1) + 1;
+  persist();
+  return true;
+}
+
+function equippedWeapon() {
+  const it = getItem(save.equipped.rifle);
+  return it ? it.kind || 'rifle' : 'rifle';
 }
 
 function getItem(id) {
@@ -67,7 +87,11 @@ function getItem(id) {
 }
 
 function addItem(slot, rarity) {
-  const item = { id: save.nextId++, slot, rarity, roll: +(0.9 + Math.random() * 0.2).toFixed(2) };
+  const item = { id: save.nextId++, slot, rarity, roll: +(0.9 + Math.random() * 0.2).toFixed(2), lvl: 1 };
+  if (slot === 'rifle') {
+    const kinds = Object.keys(WEAPONS).filter(k => WEAPONS[k].minRarity <= rarity);
+    item.kind = kinds[Math.floor(Math.random() * kinds.length)];
+  }
   save.inventory.push(item);
   return item;
 }
@@ -82,7 +106,7 @@ function salvage(id) {
   const item = getItem(id);
   if (!item || save.equipped[item.slot] === id) return 0;
   save.inventory = save.inventory.filter(i => i.id !== id);
-  const value = RARITIES[item.rarity].salvage;
+  const value = RARITIES[item.rarity].salvage * (item.lvl || 1);
   save.coins += value;
   persist();
   return value;

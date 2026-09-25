@@ -11,7 +11,7 @@ const RARITIES = [
 // Four gear slots, each boosting one stat.
 const SLOTS = [
   { id: 'helmet', name: 'Helmet', stat: 'hp',   label: 'Health',      base: 40,   fmt: v => `+${Math.round(v)} HP` },
-  { id: 'rifle',  name: 'Rifle',  stat: 'dmg',  label: 'Damage',      base: 6,    fmt: v => `+${Math.round(v)} DMG` },
+  { id: 'rifle',  name: 'Weapon', stat: 'dmg',  label: 'Damage',      base: 6,    fmt: v => `+${Math.round(v)} DMG` },
   { id: 'gloves', name: 'Gloves', stat: 'rate', label: 'Fire speed',  base: 0.08, fmt: v => `+${Math.round(v * 100)}% fire speed` },
   { id: 'scope',  name: 'Scope',  stat: 'crit', label: 'Crit chance', base: 0.03, fmt: v => `+${(v * 100).toFixed(1)}% crit` },
 ];
@@ -22,6 +22,21 @@ const GEAR_NAMES = {
   gloves: ['Cotton Gloves', 'Tactical Gloves', 'Quickdraw Gloves', 'Blaze Gloves', 'Chrono Gloves'],
   scope:  ['Iron Sight', 'Red Dot', 'Hawk Scope', 'Eagle Eye', 'Oracle Scope'],
 };
+
+// Weapon types for the Rifle slot. Each fires differently in levels.
+// dmg/rate scale the leader's shots; minRarity gates heavy weapons to better chests.
+const WEAPONS = {
+  rifle:   { name: 'Assault Rifle',   dmg: 1,    rate: 1,    minRarity: 0, trait: 'Balanced all-rounder',           color: '#6b7f4a' },
+  smg:     { name: 'SMG',             dmg: 0.65, rate: 1.7,  minRarity: 0, trait: 'Very fast fire',                  color: '#4a6fa5' },
+  shotgun: { name: 'Shotgun',         dmg: 0.38,  rate: 0.7,  minRarity: 1, trait: 'Fires 5 pellets in a spread',     color: '#a5643a', pellets: 5 },
+  sniper:  { name: 'Sniper Rifle',    dmg: 2.8,  rate: 0.45, minRarity: 1, trait: 'Huge damage, pierces 3 enemies',  color: '#3f5f4a', pierce: 3 },
+  minigun: { name: 'Minigun',         dmg: 0.5,  rate: 2.6,  minRarity: 2, trait: 'Bullet storm',                    color: '#c9a23a' },
+  rocket:  { name: 'Rocket Launcher', dmg: 3.6,  rate: 0.4,  minRarity: 2, trait: 'Rockets explode in an area',      color: '#4f8a3a', splash: 0.55 },
+};
+const RARITY_PREFIX = ['Rusty', 'Tactical', 'Elite', 'Golden', 'Mythic'];
+const GEAR_MAX_LVL = 10;
+const gearUpgradeCost = item => Math.round(80 * (item.rarity + 1) * Math.pow(item.lvl || 1, 1.45));
+const FREE_CHEST_MS = 4 * 60 * 60 * 1000;
 
 const SKILLS = [
   { id: 'hp',   name: 'Toughness',      desc: 'Max health',  per: 0.12,  fmt: l => `+${Math.round(l * 12)}% health` },

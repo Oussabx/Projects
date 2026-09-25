@@ -102,6 +102,7 @@ const Game = (() => {
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
+      weapon: equippedWeapon(), leaderCd: 0.2,
       squad: 6, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
@@ -212,8 +213,8 @@ const Game = (() => {
     const xs = both ? [-0.5, 0.5] : [rand(-0.6, 0.6)];
     for (const x of xs) {
       const roll = Math.random();
-      const drop = roll < 0.5 ? 'squad' : roll < 0.65 ? 'gatling' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
-      const base = drop === 'squad' ? 1.3 : drop === 'gatling' ? 1.6 : 1;
+      const drop = roll < 0.5 ? 'squad' : roll < 0.58 ? 'minigun' : roll < 0.66 ? 'rocket' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
+      const base = drop === 'squad' ? 1.3 : drop === 'minigun' || drop === 'rocket' ? 1.7 : 1;
       const hp = Math.round((40 + run.gl * 45) * base * rand(0.8, 1.6) / 10) * 10;
       const gain = Math.round(rand(4, 8) + run.gl * 1.3);
       run.barrels.push({ x, z, hp, maxHp: hp, drop, gain, acc: 0, accT: 0, t: Math.random() * 9 });
@@ -329,6 +330,12 @@ const Game = (() => {
       fire();
       r.fireCd += 1 / Math.max(rate, 0.5);
     }
+    r.leaderCd -= dt;
+    const wpn = WEAPONS[r.weapon];
+    while (r.leaderCd <= 0) {
+      fireLeader(wpn);
+      r.leaderCd += 1 / Math.max(rate * wpn.rate, 0.3);
+    }
 
     updateBullets(dt);
     updateZombies(dt, move);
@@ -367,25 +374,41 @@ const Game = (() => {
     }
   }
 
+  // Squad volley: soldiers deal 30% of the leader's damage each. Bullets drawn are capped, so each carries a share.
   function fire() {
     const r = run;
-    const n = r.shots;
-    const gap = 0.13;
-    // Soldiers deal 40% of the leader's damage. Bullets drawn are capped, so each carries a share.
-    const vis = Math.min(n + r.squad, MAX_VOLLEY);
-    const share = (n + r.squad * 0.3) / vis;
-    for (let i = 0; i < n; i++) {
-      const off = (i - (n - 1) / 2) * gap;
-      r.bullets.push({ x: r.x + 0.08 + off, z: 0.9, vx: off * 0.25, m: share });
-    }
-    const extra = vis - n;
+    if (!r.squad) return;
+    const vis = Math.min(r.squad, MAX_VOLLEY);
+    const share = r.squad * 0.3 / vis;
     const slots = r.slots;
-    for (let i = 0; i < extra && slots.length; i++) {
+    for (let i = 0; i < vis && slots.length; i++) {
       const sl = slots[Math.floor(Math.random() * slots.length)];
       r.bullets.push({ x: sl.x + 0.05, z: sl.z + 0.45 + Math.random() * 0.3, vx: 0, m: share });
     }
-    r.flash = 0.06;
     Sound.play('shoot');
+  }
+
+  // The leader fires their weapon: pellets, piercing shots or rockets.
+  function fireLeader(W) {
+    const r = run;
+    const x0 = r.x + 0.08;
+    if (W.splash) {
+      r.bullets.push({ x: x0, z: 1, vx: 0, m: W.dmg * r.shots, rocket: true, sp: 16, splash: W.splash });
+      Sound.play('throw');
+    } else if (W.pellets) {
+      const n = W.pellets + (r.shots - 1) * 2;
+      for (let i = 0; i < n; i++) r.bullets.push({ x: x0, z: 0.9, vx: (i - (n - 1) / 2) * 0.18, m: W.dmg });
+      Sound.play('shoot');
+    } else {
+      const n = r.shots, gap = 0.13;
+      const jitter = r.weapon === 'minigun' ? 0.06 : 0;
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2) * gap;
+        r.bullets.push({ x: x0 + off + rand(-jitter, jitter), z: 0.9, vx: off * 0.25, m: W.dmg, pierce: W.pierce || 0, big: !!W.pierce });
+      }
+      Sound.play('shoot');
+    }
+    r.flash = 0.06;
   }
 
   function bulletDamage(m = 1) {
@@ -417,21 +440,9 @@ const Game = (() => {
     for (let i = r.bullets.length - 1; i >= 0; i--) {
       const b = r.bullets[i];
       const prevZ = b.z;
-      b.z += BULLET_SPEED * dt;
+      b.z += (b.sp || BULLET_SPEED) * dt;
       b.x += b.vx * dt;
       let hit = false;
-
-      // Gates are hit when the bullet crosses their plane.
-      for (const g of r.gates) {
-        if (prevZ < g.z && b.z >= g.z) {
-          const side = g.sides.find(s => Math.sign(b.x || 0.001) === s.side);
-          if (side && (side.type === 'dmg' || side.type === 'rate' || side.type === 'squad')) {
-            // Shooting a sign raises its value (red signs climb toward positive).
-            side.val = Math.min(side.val + (side.type === 'squad' ? 0.12 : 0.2) * b.m * 2, side.type === 'squad' ? 60 : 90);
-            break;
-          }
-        }
-      }
 
       if (!hit) {
         let target = null, bestZ = Infinity;
@@ -446,8 +457,11 @@ const Game = (() => {
         if (boss && boss.hp > 0 && Math.abs(boss.x - b.x) < 0.34 * boss.size && boss.z > prevZ - 0.8 && boss.z < b.z + 0.4 && boss.z < bestZ) {
           target = boss;
         }
+        if (target && b.hits && b.hits.has(target)) target = null;
         if (target) {
           hit = true;
+          if (b.rocket) { explodeRocket(b, target); r.bullets.splice(i, 1); continue; }
+          if (b.pierce > 0) { b.pierce--; (b.hits || (b.hits = new Set())).add(target); hit = false; }
           const { dmg } = bulletDamage(b.m);
           target.hp -= dmg;
           target.acc = (target.acc || 0) + dmg;
@@ -460,6 +474,20 @@ const Game = (() => {
 
       if (hit || b.z > RANGE) r.bullets.splice(i, 1);
     }
+  }
+
+  function explodeRocket(b, first) {
+    const r = run;
+    const { dmg } = bulletDamage(b.m);
+    const cx = first.x, cz = first.z;
+    const hitOne = t => { t.hp -= dmg; t.acc = (t.acc || 0) + dmg; if (t.accT === undefined) t.accT = 0; t.flash = 0.1; if (t.hp <= 0) onKill(t); };
+    for (const z of [...r.zombies]) if (Math.hypot(z.x - cx, (z.z - cz) * 0.6) < b.splash) hitOne(z);
+    for (const br of [...r.barrels]) if (Math.hypot(br.x - cx, (br.z - cz) * 0.6) < b.splash) hitOne(br);
+    if (r.boss && r.boss.hp > 0 && (first === r.boss || Math.hypot(r.boss.x - cx, (r.boss.z - cz) * 0.6) < b.splash + 0.3)) hitOne(r.boss);
+    burst(cx, cz, '#ffb02e', 18); burst(cx, cz, '#ff5a3a', 10);
+    r.fx.push({ type: 'ring', x: cx, z: cz, t: 0.35, max: 0.35, rad: b.splash });
+    Sound.play('explode');
+    r.shake = Math.max(r.shake, 0.12);
   }
 
   function onKill(t) {
@@ -498,7 +526,7 @@ const Game = (() => {
     const say = (t, c) => addText(W / 2, H * 0.42, t, c, 26, 1.2);
     Sound.play(drop === 'coins' ? 'coin' : 'powerup');
     if (drop === 'squad') { addSquad(at.gain); say(`+${at.gain} SOLDIERS`, '#8fd2ff'); }
-    else if (drop === 'gatling') { r.shots = Math.min(MAX_SHOTS, r.shots + 1); r.rateMult *= 1.15; say('GATLING!', '#ffd23a'); }
+    else if (drop === 'minigun' || drop === 'rocket') { r.weapon = drop; r.leaderCd = 0; say(drop === 'minigun' ? 'MINIGUN!' : 'ROCKET LAUNCHER!', '#ffd23a'); }
     else if (drop === 'shield') { r.shield = 6; say('SHIELD!', '#6fd3ff'); }
     else if (drop === 'rage') { r.rage = 6; say('RAGE x2!', '#ff6a3a'); }
     else if (drop === 'medkit') { r.hp = Math.min(r.maxHp, r.hp + r.maxHp * 0.25); say('+25% HP', '#5dff8a'); }
@@ -908,8 +936,9 @@ const Game = (() => {
     ctx.fillStyle = r.rage > 0 ? '#ff8a4a' : '#ffd23a';
     ctx.beginPath();
     for (const b of r.bullets) {
-      const p = proj(b.x, b.z), q = proj(b.x, b.z - 0.55);
-      const w = Math.max(1.6, 4.5 * p.s);
+      if (b.rocket) continue;
+      const p = proj(b.x, b.z), q = proj(b.x, b.z - (b.big ? 1.1 : 0.55));
+      const w = Math.max(1.6, (b.big ? 7 : 4.5) * p.s);
       const ty = p.y - hy * p.s, by = q.y - hy * q.s;
       ctx.moveTo(p.x, ty - w);
       ctx.quadraticCurveTo(p.x + w, ty, q.x, by);
@@ -919,11 +948,18 @@ const Game = (() => {
     ctx.fillStyle = 'rgba(255,255,230,.9)';
     ctx.beginPath();
     for (const b of r.bullets) {
+      if (b.rocket) continue;
       const p = proj(b.x, b.z);
       ctx.moveTo(p.x, p.y - hy * p.s);
       ctx.arc(p.x, p.y - hy * p.s, Math.max(0.8, 1.8 * p.s), 0, Math.PI * 2);
     }
     ctx.fill();
+
+    for (const b of r.bullets) {
+      if (!b.rocket) continue;
+      const p = proj(b.x, b.z);
+      drawRocketShot(ctx, p.x, p.y - hy * p.s, Math.max(5, 0.13 * roadW * p.s), r.t);
+    }
 
     drawGroupCounters();
 
@@ -949,6 +985,11 @@ const Game = (() => {
         ctx.fillStyle = f.color; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 1.5;
         ctx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h); ctx.strokeRect(-f.w / 2, -f.h / 2, f.w, f.h);
         ctx.restore();
+      } else if (f.type === 'ring') {
+        const p = proj(f.x, f.z), k = 1 - a;
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 5 * a + 1;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, f.rad * XS * roadW * p.s * (0.4 + k), f.rad * 0.35 * roadW * p.s * (0.4 + k), 0, 0, Math.PI * 2); ctx.stroke();
       } else if (f.type === 'boom') {
         ctx.globalAlpha = a * 0.6;
         ctx.fillStyle = '#ffb02e';
@@ -995,8 +1036,8 @@ const Game = (() => {
       drawTrooper(ctx, p.x - w * 0.2, top, th, 0, { back: false, phase: 1 });
       drawTrooper(ctx, p.x + w * 0.2, top, th, 0, { back: false, phase: 2 });
       tag(`+${b.gain}`, p.x, top - th * 1.05, Math.max(10, 0.2 * roadW * p.s), '#8fd2ff');
-    } else if (b.drop === 'gatling') {
-      drawGatling(ctx, p.x, top - w * 0.25, w * 0.95, run.t);
+    } else if (b.drop === 'minigun' || b.drop === 'rocket') {
+      drawWeaponSide(ctx, b.drop, p.x, top - w * 0.3 + Math.sin(run.t * 4) * 2, w * 1.25, { rot: -0.2 });
     } else {
       drawPickup(ctx, p.x, top - w * 0.3, w * 0.6, b.drop, run.t);
     }
@@ -1098,7 +1139,7 @@ const Game = (() => {
     const h = 0.62 * roadW;
     if (r.hurt > 0 && Math.floor(r.hurt * 25) % 2) return;
     // Extra guns from "+1 GUN" gates appear as buddy muzzles
-    drawSoldierBack(ctx, p.x, p.y, h, r.t, r.flash);
+    drawSoldierBack(ctx, p.x, p.y, h, r.t, r.flash, r.weapon);
     if (r.shield > 0) {
       ctx.save();
       ctx.globalAlpha = 0.35 + 0.15 * Math.sin(r.t * 10);
@@ -1139,6 +1180,7 @@ const Game = (() => {
 
     const chips = [];
     const chip = (cls, ic, color, text) => chips.push(`<span class="buff tx ${cls}">${icon(ic, color, 18)}${text}</span>`);
+    chip('guns', r.weapon, '#fff', WEAPONS[r.weapon].name.split(' ').pop().toUpperCase());
     if (r.shots > 1) chip('guns', 'rifle', '#fff', `x${r.shots}`);
     if (Math.abs(r.dmgMult - 1) > 0.01) chip(r.dmgMult < 1 ? 'bad' : '', 'burst', '#ff8a1f', `${Math.round(r.dmgMult * 100)}%`);
     if (Math.abs(r.rateMult - 1) > 0.01) chip(r.rateMult < 1 ? 'bad' : '', 'fire', '#ffc933', `${Math.round(r.rateMult * 100)}%`);

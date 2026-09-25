@@ -20,6 +20,28 @@ const UI = (() => {
     return String(Math.round(n));
   }
 
+  function fmtTime(ms) {
+    const m = Math.ceil(ms / 60000), h = Math.floor(m / 60);
+    return h ? `${h}h ${m % 60}m` : `${m}m`;
+  }
+
+  // Currency counters tick up/down to their new value.
+  const shown = {};
+  function countTo(id, value) {
+    const el = document.getElementById(id);
+    const from = shown[id] ?? value;
+    shown[id] = value;
+    if (from === value) { el.textContent = fmt(value); return; }
+    el.parentElement.classList.remove('bump'); void el.offsetWidth; el.parentElement.classList.add('bump');
+    const t0 = performance.now(), dur = 600;
+    const step = now => {
+      const k = Math.min(1, (now - t0) / dur);
+      el.textContent = fmt(from + (value - from) * (1 - Math.pow(1 - k, 3)));
+      if (k < 1 && shown[id] === value) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   function toast(msg) {
     const t = $('#toast');
     t.textContent = msg;
@@ -46,11 +68,17 @@ const UI = (() => {
   function slotDef(id) { return SLOTS.find(s => s.id === id); }
   function progress(ch = selectedChapter) { return save.progress[CHAPTERS[ch].id]; }
 
+  function itemIcon(item) { return item.slot === 'rifle' ? item.kind || 'rifle' : item.slot; }
+
   function tile(item, opts = {}) {
     const rar = RARITIES[item.rarity];
     const eq = save.equipped[item.slot] === item.id;
+    const stars = '<span class="tile-stars">' + '★'.repeat(item.rarity + 1) + '</span>';
     return `<button class="tile r-${rar.id} ${opts.cls || ''}" data-item="${item.id}" aria-label="${rar.name} ${itemName(item)}">
-      ${icon(item.slot, '#ffffff', 64)}<span class="gem-dot"></span>
+      <span class="tile-shine"></span>
+      ${icon(itemIcon(item), '#ffffff', 64)}
+      ${stars}
+      ${(item.lvl || 1) > 1 ? `<span class="tile-lvl tx">Lv${item.lvl}</span>` : ''}
       ${eq && !opts.noTag ? '<span class="tag tx">ON</span>' : ''}
     </button>`;
   }
@@ -60,8 +88,8 @@ const UI = (() => {
   // ---------- Top bar ----------
 
   function renderTop() {
-    $('#coins').textContent = fmt(save.coins);
-    $('#gems').textContent = fmt(save.gems);
+    countTo('coins', save.coins);
+    countTo('gems', save.gems);
     $('#profile-name').textContent = save.name;
     $('#profile-power').textContent = fmt(playerStats().power);
     $('#profile-lvl').textContent = 1 + totalStars();
@@ -73,7 +101,7 @@ const UI = (() => {
 
   function renderNavDots() {
     const canSkill = SKILLS.some(s => save.skills[s.id] < SKILL_MAX && save.coins >= skillCost(save.skills[s.id]));
-    const canChest = CHESTS.some(c => save[c.currency] >= c.price);
+    const canChest = CHESTS.some(c => save[c.currency] >= c.price) || save.freeChestAt <= Date.now();
     const upgrade = SLOTS.some(s => {
       const cur = getItem(save.equipped[s.id]);
       return save.inventory.some(i => i.slot === s.id && (!cur || itemStat(i) > itemStat(cur)));
@@ -294,7 +322,9 @@ const UI = (() => {
       <div class="inventory" id="inventory">${inv.length ? inv.map(i => tile(i)).join('') : '<div class="empty-note">No gear here yet. Open chests in the Shop to find some.</div>'}</div>
       <button class="btn green" id="equip-best"><span class="tx">Equip best</span></button>`;
 
-    drawSoldierFront($('#gear-canvas').getContext('2d'), 150, 330, 290, 0);
+    const gc = $('#gear-canvas').getContext('2d');
+    drawSoldierFront(gc, 135, 330, 290, 0);
+    drawWeaponSide(gc, equippedWeapon(), 205, 250, 150, { rot: -1.05 });
     fitInventory();
     const s = $('#screen-gear');
     s.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
@@ -324,22 +354,42 @@ const UI = (() => {
     const slot = slotDef(item.slot);
     const cur = getItem(save.equipped[item.slot]);
     const isEq = cur && cur.id === item.id;
+    const lvl = item.lvl || 1;
+    const maxed = lvl >= GEAR_MAX_LVL;
+    const cost = gearUpgradeCost(item);
+    const w = item.slot === 'rifle' ? WEAPONS[item.kind || 'rifle'] : null;
     let delta = '';
     if (!isEq) {
       const d = itemStat(item) - (cur ? itemStat(cur) : 0);
       delta = `<span class="delta tx ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${slot.fmt(Math.abs(d)).replace('+', '')} vs equipped</span>`;
     }
+    const next = maxed ? '' : `<span class="next tx">→ ${slot.fmt(itemStat({ ...item, lvl: lvl + 1 }))}</span>`;
     sheet(slot.name, `
-      <div class="rays-wrap" style="--glow:${rar.color}"><div class="rays"></div>${tile(item, { noTag: true, cls: 'big reveal' })}</div>
-      <div class="rarity tx" style="color:${rar.color}">${rar.name}</div>
+      <div class="item-hero" style="--glow:${rar.color}">
+        <div class="rays"></div>
+        ${w ? `<canvas id="m-weapon" width="440" height="200"></canvas>` : tile(item, { noTag: true, cls: 'big reveal' })}
+      </div>
+      <div class="rarity-row"><span class="rarity-pill tx" style="background:${rar.color}">${rar.name}</span><span class="lvl-pill tx">Lv ${lvl}/${GEAR_MAX_LVL}</span></div>
       <div class="item-name tx">${itemName(item)}</div>
-      ${statLine(item)}
+      ${w ? `<div class="trait">${w.trait}</div>` : ''}
+      <div class="item-stat tx">${statIcon(slot.stat)}${slot.fmt(itemStat(item))} ${next}</div>
+      ${w ? `<div class="wstats">
+        <div><small>Damage</small><div class="meter"><i style="width:${Math.min(100, w.dmg * 28)}%"></i></div></div>
+        <div><small>Fire rate</small><div class="meter"><i style="width:${Math.min(100, w.rate * 38)}%"></i></div></div>
+      </div>` : ''}
       ${delta}
+      <button class="btn blue wide" id="m-upgrade" ${maxed || save.coins < cost ? 'disabled' : ''}>
+        ${maxed ? '<span class="tx">MAX LEVEL</span>' : `<span class="tx">Upgrade</span>${icon('coin')}<span class="tx">${fmt(cost)}</span>`}
+      </button>
       <div class="actions">
         ${isEq ? '<button class="btn grey" disabled><span class="tx">Equipped</span></button>'
-               : `<button class="btn red" id="m-salvage"><span class="tx">Sell</span>${icon('coin')}<span class="tx">${rar.salvage}</span></button>
+               : `<button class="btn red" id="m-salvage"><span class="tx">Sell</span>${icon('coin')}<span class="tx">${rar.salvage * lvl}</span></button>
                   <button class="btn green" id="m-equip"><span class="tx">Equip</span></button>`}
       </div>`, { close: true, ribbon: 'purple' });
+    if (w) drawWeaponSide($('#m-weapon').getContext('2d'), item.kind || 'rifle', 220, 100, 330, { rot: -0.12, accent: rar.color });
+    $('#m-upgrade').onclick = () => {
+      if (upgradeItem(item.id)) { Sound.play('upgrade'); render('gear'); itemDetail(item.id); toast(`${itemName(item)} Lv ${item.lvl}`); }
+    };
     if (!isEq) {
       $('#m-equip').onclick = () => { equip(item.id); Sound.play('equip'); closeModal(); render('gear'); toast('Equipped'); };
       $('#m-salvage').onclick = () => { const v = salvage(item.id); Sound.play('coin'); closeModal(); render('gear'); toast(`Sold for ${v} coins`); };
@@ -388,8 +438,14 @@ const UI = (() => {
     const odds = o => o.map((p, i) => p ? `<span class="tx" style="color:${RARITIES[i].color}">${RARITIES[i].name.slice(0, 4)} ${p}%</span>` : '').join('');
     const tabs = [['chests', 'Chests', 'chest', '#c98b4a'], ['coins', 'Coins', 'coin', ''], ['gems', 'Gems', 'gem', '']]
       .map(([id, label, ic, c]) => `<button class="seg tx ${shopTab === id ? 'on' : ''}" data-shoptab="${id}">${icon(ic, c)}${label}</button>`).join('');
-    let cards = '';
+    let cards = '', freeCard = '';
     if (shopTab === 'chests') {
+      const wait = save.freeChestAt - Date.now();
+      freeCard = `<div class="panel free-card ${wait > 0 ? '' : 'ready'}">
+        <div class="free-art">${icon('chest', '#c98b4a', 64)}</div>
+        <div class="free-text"><div class="tx">Free Supply Crate</div><small id="free-timer">${wait > 0 ? 'Next in ' + fmtTime(wait) : 'Ready to open!'}</small></div>
+        <button class="btn green" id="free-btn" ${wait > 0 ? 'disabled' : ''}><span class="tx">${wait > 0 ? 'WAIT' : 'FREE'}</span></button>
+      </div>`;
       cards = CHESTS.map(c => {
         const [cls, glow, flag] = chestStyle[c.id];
         return `<div class="panel offer ${cls}" style="--glow:${glow}">
@@ -423,10 +479,18 @@ const UI = (() => {
     $('#screen-shop').innerHTML = `
       <div class="ribbon pink"><span class="tx">Shop</span></div>
       <div class="segs">${tabs}</div>
+      ${freeCard}
       <div class="shop-grid">${cards}</div>
       <p class="note">${notes[shopTab]}</p>`;
 
     const s = $('#screen-shop');
+    const fb = $('#free-btn');
+    if (fb) fb.onclick = () => {
+      if (save.freeChestAt > Date.now()) return;
+      save.freeChestAt = Date.now() + FREE_CHEST_MS;
+      persist();
+      chestOpening(CHESTS[0]);
+    };
     s.querySelectorAll('[data-shoptab]').forEach(b => b.addEventListener('click', () => { shopTab = b.dataset.shoptab; render('shop'); }));
     s.querySelectorAll('[data-chest]').forEach(b => b.addEventListener('click', () => {
       const c = CHESTS.find(x => x.id === b.dataset.chest);
@@ -766,6 +830,14 @@ const UI = (() => {
     lockScroll(document.querySelector('.screens'));
     document.querySelectorAll('.screen').forEach(lockScroll);
     applySettings();
+    setInterval(() => {
+      const ft = document.getElementById('free-timer');
+      if (ft && tab === 0) { const w = save.freeChestAt - Date.now(); if (w <= 0) render('shop'); else ft.textContent = 'Next in ' + fmtTime(w); }
+    }, 30000);
+    const sp = document.createElement('div');
+    sp.className = 'sparkles';
+    sp.innerHTML = Array.from({ length: 16 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--d:${6 + (i % 5) * 1.7}s;--dl:${-(i * 1.3)}s;--s:${3 + (i % 3) * 2}px"></i>`).join('');
+    document.querySelector('.screens').prepend(sp);
     $('#modal').addEventListener('click', e => {
       if (e.target.id === 'modal' && $('#m-close')) closeModal();
     });
