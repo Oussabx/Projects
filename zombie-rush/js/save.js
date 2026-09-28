@@ -26,6 +26,8 @@ function defaultSave() {
       ch6: { unlocked: 1, stars: [0, 0, 0, 0, 0, 0], best: [0, 0, 0, 0, 0, 0] },
     },
     chests: [],
+    modes: { touchline: 0, survival: 0, extraction: 0, ammo: 0 },
+    daily: { day: '', picks: [], prog: {}, claimed: [], bonus: false },
   };
 }
 
@@ -43,6 +45,8 @@ function loadSave() {
       data.chests = data.chests || [];
       data.inventory.forEach(i => { if (i.slot === 'rifle' && !i.kind) i.kind = 'rifle'; if (!i.lvl) i.lvl = 1; });
       if (data.freeChestAt === undefined) data.freeChestAt = 0;
+      data.modes = Object.assign(defaultSave().modes, data.modes);
+      data.daily = Object.assign(defaultSave().daily, data.daily);
       return data;
     }
   } catch { /* storage unavailable or corrupt: start fresh */ }
@@ -116,6 +120,24 @@ function salvage(id) {
   return value;
 }
 
+// Merge three unequipped items of one rarity into a random item one rarity higher.
+// Coins spent upgrading the three items are refunded.
+function mergeItems(ids) {
+  const items = ids.map(getItem);
+  if (items.length !== 3 || items.some(i => !i) || new Set(ids).size !== 3) return null;
+  const rarity = items[0].rarity;
+  if (rarity >= RARITIES.length - 1 || items.some(i => i.rarity !== rarity || save.equipped[i.slot] === i.id)) return null;
+  let refund = 0;
+  for (const it of items) for (let l = 1; l < (it.lvl || 1); l++) refund += gearUpgradeCost({ ...it, lvl: l });
+  save.inventory = save.inventory.filter(i => !ids.includes(i.id));
+  save.coins += refund;
+  const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)].id;
+  const item = addItem(slot, rarity + 1);
+  track('merges', 1);
+  persist();
+  return { item, refund };
+}
+
 function equipBest() {
   for (const slot of SLOTS) {
     const best = save.inventory
@@ -135,6 +157,7 @@ function openChest(chest) {
   }
   const slot = chest.slot || SLOTS[Math.floor(Math.random() * SLOTS.length)].id;
   const item = addItem(slot, rarity);
+  track('chests', 1);
   persist();
   return item;
 }
@@ -171,4 +194,41 @@ function chapterUnlocked(ch) {
 
 function totalStars() {
   return Object.values(save.progress).reduce((sum, ch) => sum + ch.stars.reduce((a, b) => a + b, 0), 0);
+}
+
+// ---------- Daily challenges ----------
+
+function todayKey(d = new Date()) {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+// Three challenges a day, picked from the pool with the date as the seed.
+function dailyState() {
+  const day = todayKey();
+  if (save.daily.day !== day) {
+    let seed = [...day].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const pool = CHALLENGE_POOL.slice();
+    const picks = [];
+    for (let i = 0; i < 3; i++) {
+      const c = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
+      const k = Math.floor(rnd() * c.goals.length);
+      picks.push({ id: c.id, goal: c.goals[k], k });
+    }
+    save.daily = { day, picks, prog: {}, claimed: [false, false, false], bonus: false };
+    persist();
+  }
+  return save.daily;
+}
+
+// Record progress for daily challenges. 'max' stats keep the best value reached today.
+function track(stat, n = 1, mode = 'add') {
+  const d = dailyState();
+  const cur = d.prog[stat] || 0;
+  d.prog[stat] = mode === 'max' ? Math.max(cur, n) : cur + n;
+  persist();
+}
+
+function challengeReward(pick) {
+  return { coins: 250 * (pick.k + 1), gems: 15 * (pick.k + 1) };
 }

@@ -2,7 +2,7 @@
 
 const UI = (() => {
   const $ = sel => document.querySelector(sel);
-  const TAB_IDS = ['shop', 'gear', 'play', 'skills', 'ranks'];
+  const TAB_IDS = ['shop', 'gear', 'play', 'skills', 'modes'];
   const STAT_ICON = { hp: ['heart', '#ff4d5e'], dmg: ['burst', '#ff8a1f'], rate: ['fire', '#ff6a2a'], crit: ['target', '#2fe0c4'] };
   let tab = 2;
   let selectedLevel = 0;
@@ -11,6 +11,8 @@ const UI = (() => {
   let shopTab = 'chests';
   let sceneRaf = 0;
   let paused = false;
+  let modesTab = 'modes';
+  let currentMode = null;   // mode being played, or null for a chapter level
 
   // ---------- Helpers ----------
 
@@ -106,7 +108,9 @@ const UI = (() => {
       const cur = getItem(save.equipped[s.id]);
       return save.inventory.some(i => i.slot === s.id && (!cur || itemStat(i) > itemStat(cur)));
     });
-    const dots = { 0: canChest, 1: upgrade, 2: save.chests.length > 0 && tab !== 2, 3: canSkill };
+    const d = dailyState();
+    const canClaim = d.picks.some((pk, i) => !d.claimed[i] && (d.prog[CHALLENGE_POOL.find(c => c.id === pk.id).stat] || 0) >= pk.goal);
+    const dots = { 0: canChest, 1: upgrade, 2: save.chests.length > 0 && tab !== 2, 3: canSkill, 4: canClaim };
     document.querySelectorAll('.navbar .tab').forEach(b => {
       b.querySelector('.tab-dot')?.remove();
       if (dots[b.dataset.tab]) b.insertAdjacentHTML('beforeend', '<span class="tab-dot"></span>');
@@ -123,7 +127,7 @@ const UI = (() => {
   }
 
   function render(id) {
-    ({ shop: renderShop, gear: renderGear, play: renderPlay, skills: renderSkills, ranks: renderRanks })[id]();
+    ({ shop: renderShop, gear: renderGear, play: renderPlay, skills: renderSkills, modes: renderModes })[id]();
     renderTop();
     if (tab === 2 && $('#game-view').hidden) startScene(); else stopScene();
   }
@@ -349,7 +353,10 @@ const UI = (() => {
       </div>
       <div class="sub-head"><h3 class="tx">Backpack · ${save.inventory.length}</h3><div class="filters">${filters}</div></div>
       <div class="inventory" id="inventory">${inv.length ? inv.map(i => tile(i)).join('') : '<div class="empty-note">No gear here yet. Open chests in the Shop to find some.</div>'}</div>
-      <button class="btn green" id="equip-best"><span class="tx">Equip best</span></button>`;
+      <div class="gear-actions">
+        <button class="btn purple" id="merge-btn">${icon('merge', '#fff', 22)}<span class="tx">Merge</span>${mergeableCount() ? `<span class="merge-dot tx">${mergeableCount()}</span>` : ''}</button>
+        <button class="btn green" id="equip-best"><span class="tx">Equip best</span></button>
+      </div>`;
 
     const gc = $('#gear-canvas').getContext('2d');
     drawSoldierFront(gc, 135, 330, 290, 0);
@@ -359,6 +366,84 @@ const UI = (() => {
     s.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
     s.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => { gearFilter = b.dataset.filter; render('gear'); }));
     $('#equip-best').onclick = () => { equipBest(); Sound.play('equip'); render('gear'); toast('Best gear equipped'); };
+    $('#merge-btn').onclick = () => mergeSheet([]);
+  }
+
+  // ---------- Merge: 3 of a rarity -> 1 random item of the next rarity ----------
+
+  const canMerge = i => i.rarity < RARITIES.length - 1 && save.equipped[i.slot] !== i.id;
+  // How many merges are possible right now (for the badge on the button).
+  function mergeableCount() {
+    const by = {};
+    save.inventory.filter(canMerge).forEach(i => { by[i.rarity] = (by[i.rarity] || 0) + 1; });
+    return Object.values(by).reduce((n, c) => n + Math.floor(c / 3), 0);
+  }
+
+  function mergeSheet(picked) {
+    picked = picked.filter(id => getItem(id));
+    const first = picked.length ? getItem(picked[0]) : null;
+    const pool = save.inventory.filter(canMerge).sort((a, b) => a.rarity - b.rarity || itemStat(a) - itemStat(b));
+    const next = first ? RARITIES[first.rarity + 1] : null;
+    const slotBox = i => picked[i] ? tile(getItem(picked[i]), { noTag: true, cls: 'merge-in' }) : `<div class="tile empty merge-empty"><span class="tx">${i + 1}</span></div>`;
+    sheet('Merge', `
+      <p class="merge-help">Pick <b>3</b> items of the same rarity. You get a random piece of gear <b>one rarity higher</b>. Upgrade coins are refunded.</p>
+      <div class="merge-row">
+        ${slotBox(0)}<span class="merge-plus tx">+</span>${slotBox(1)}<span class="merge-plus tx">+</span>${slotBox(2)}
+        <span class="merge-arrow tx">➜</span>
+        <div class="tile merge-out ${next ? 'r-' + next.id : 'empty'}" style="${next ? '--glow:' + next.color : ''}"><span class="tx">?</span>${next ? `<span class="merge-rar tx" style="color:${next.color}">${next.name}</span>` : ''}</div>
+      </div>
+      <div class="merge-grid">${pool.length ? pool.map(i => {
+        const on = picked.includes(i.id), off = !on && ((first && i.rarity !== first.rarity) || picked.length >= 3);
+        return `<div class="merge-pick ${on ? 'on' : ''} ${off ? 'off' : ''}">${tile(i, { noTag: true })}${on ? '<span class="merge-check tx">✓</span>' : ''}</div>`;
+      }).join('') : '<div class="empty-note">No gear to merge yet. Equipped and Mythic items can\'t be merged.</div>'}</div>
+      <div class="actions">
+        <button class="btn blue" id="m-auto"><span class="tx">Auto pick</span></button>
+        <button class="btn green" id="m-merge" ${picked.length === 3 ? '' : 'disabled'}><span class="tx">Merge</span></button>
+      </div>`, { close: true, ribbon: 'purple', cls: 'merge-sheet' });
+    document.querySelectorAll('.merge-grid [data-item]').forEach(b => b.addEventListener('click', () => {
+      const id = +b.dataset.item, it = getItem(id);
+      if (picked.includes(id)) mergeSheet(picked.filter(x => x !== id));
+      else if (picked.length < 3 && (!first || it.rarity === first.rarity)) { Sound.play('click'); mergeSheet([...picked, id]); }
+      else toast(first && it.rarity !== first.rarity ? 'Pick items of the same rarity' : 'Three items max');
+    }));
+    document.querySelectorAll('.merge-row [data-item]').forEach(b => b.addEventListener('click', () => mergeSheet(picked.filter(x => x !== +b.dataset.item))));
+    $('#m-auto').onclick = () => {
+      // Lowest rarity that has three mergeable items, weakest first.
+      for (let r = 0; r < RARITIES.length - 1; r++) {
+        const c = pool.filter(i => i.rarity === r);
+        if (c.length >= 3) { mergeSheet(c.slice(0, 3).map(i => i.id)); return; }
+      }
+      toast('You need 3 items of the same rarity');
+    };
+    $('#m-merge').onclick = () => {
+      const res = mergeItems(picked);
+      if (!res) return;
+      const { item, refund } = res;
+      const rar = RARITIES[item.rarity];
+      sheet('Merge', `
+        <div class="merge-anim">${picked.map((_, k) => `<span class="merge-fly f${k}">${icon('chest', '#fff', 40)}</span>`).join('')}<div class="merge-flash"></div></div>
+        <p>Merging…</p>`, { ribbon: 'purple' });
+      Sound.play('chest');
+      setTimeout(() => {
+        Sound.play('reveal');
+        const cur = getItem(save.equipped[item.slot]);
+        const better = !cur || itemStat(item) > itemStat(cur);
+        sheet('Merged!', `
+          <div class="rays-wrap" style="--glow:${rar.color}"><div class="rays"></div>${tile(item, { noTag: true, cls: 'big reveal' })}</div>
+          <div class="rarity tx" style="color:${rar.color}">${rar.name}!</div>
+          <div class="item-name tx">${itemName(item)}</div>
+          ${statLine(item)}
+          ${refund ? `<span class="delta up tx">+${fmt(refund)} coins refunded</span>` : ''}
+          <div class="actions">
+            <button class="btn grey" id="m-again"><span class="tx">Merge more</span></button>
+            ${better ? '<button class="btn green" id="m-equip"><span class="tx">Equip</span></button>' : '<button class="btn green" id="m-ok"><span class="tx">OK</span></button>'}
+          </div>`, { ribbon: item.rarity >= 3 ? '' : 'purple' });
+        render('gear');
+        $('#m-again').onclick = () => mergeSheet([]);
+        if (better) $('#m-equip').onclick = () => { equip(item.id); Sound.play('equip'); closeModal(); render('gear'); toast('Equipped'); };
+        else $('#m-ok').onclick = () => { closeModal(); render('gear'); };
+      }, 1200);
+    };
   }
 
   // Backpack scrolls sideways: use as many rows as fit the leftover height.
@@ -605,47 +690,153 @@ const UI = (() => {
     }, 1100);
   }
 
-  // ---------- Ranks ----------
 
-  function hash(str) {
-    let h = 2166136261;
-    for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-    return h >>> 0;
-  }
+  // ---------- Modes + daily challenges ----------
 
-  function avatar(p) {
-    const colors = ['#ff8a1f', '#29a8ff', '#4fd645', '#a55cff', '#ffc933', '#ff4d5e', '#2fe0c4', '#ff5fb4'];
-    const faces = ['skull', 'star', 'bolt', 'heart', 'fire', 'target'];
-    const h = hash(p.name);
-    if (p.me) return `<span class="ava" style="background:#ffc933">${icon('helmet', '#3f6b2e')}</span>`;
-    return `<span class="ava" style="background:${colors[h % colors.length]}">${icon(faces[(h >>> 3) % faces.length], '#fff')}</span>`;
-  }
+  const MODES = [
+    { id: 'touchline', name: 'Touchline', color: '#ff4d5e', ribbon: 'red', desc: 'Not one zombie gets past you. 3 breaches and the line falls.', best: v => v ? `Best: wave ${v}` : 'No record yet' },
+    { id: 'survival', name: 'Survival', color: '#a55cff', ribbon: 'purple', desc: 'Endless waves with elites and bosses. Last as long as you can.', best: v => v ? `Best: wave ${v}` : 'No record yet' },
+    { id: 'extraction', name: 'Extraction', color: '#2fb8e0', ribbon: 'blue', desc: 'Free-roam map. Grab supplies, reach the chopper. Stay longer, earn more.', best: v => v ? `Best haul: ${fmt(v)}` : 'No record yet' },
+    { id: 'ammo', name: 'Ammo Crisis', color: '#ffb000', ribbon: '', desc: 'Barely any bullets. Aim, blow up barrels, scavenge ammo.', best: v => v ? `Best: ${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : 'No record yet' },
+  ];
 
-  function renderRanks() {
-    const bots = BOT_NAMES.map((n, i) => ({ name: n, score: 400 + (hash(n) % 21000) + (i < 5 ? 12000 : 0), me: false }));
-    const all = [...bots, { name: save.name, score: totalScore(), me: true }].sort((a, b) => b.score - a.score);
-    const meIdx = all.findIndex(p => p.me);
-    const pod = (p, place, cls) => `<div class="pod ${cls}">
-      ${avatar(p)}<span class="nm tx">${p.name}${p.me ? ' (you)' : ''}</span><span class="sc tx">${fmt(p.score)}</span>
-      <div class="block tx">${place}</div></div>`;
-    const row = (p, i) => `<div class="rank ${p.me ? 'me' : ''}">
-      <span class="pos tx">${i + 1}</span>${avatar(p)}
-      <span class="nm tx">${p.name}${p.me ? ' (you)' : ''}</span>
-      <span class="sc tx">${icon('ranks', '#ffc933')}${fmt(p.score)}</span>
+  function renderModes() {
+    const d = dailyState();
+    const claimable = d.picks.some((pk, i) => !d.claimed[i] && (d.prog[challengeDef(pk).stat] || 0) >= pk.goal);
+    const tabs = `<div class="segs two">
+      <button class="seg tx ${modesTab === 'modes' ? 'on' : ''}" data-mtab="modes">${icon('modes', '#ff8a1f')}Modes</button>
+      <button class="seg tx ${modesTab === 'daily' ? 'on' : ''}" data-mtab="daily">${icon('calendar', '#ff4d5e')}Daily${claimable ? '<span class="seg-dot"></span>' : ''}</button>
     </div>`;
-    $('#screen-ranks').innerHTML = `
-      <div class="ribbon blue"><span class="tx">Leaderboard</span></div>
-      <div class="podium">${pod(all[1], 2, 'second')}${pod(all[0], 1, 'first')}${pod(all[2], 3, 'third')}</div>
-      <div class="rank-list" id="rank-list">${all.slice(3).map((p, i) => p.me ? '' : row(p, i + 3)).join('')}</div>
-      ${meIdx >= 3 ? row(all[meIdx], meIdx) : ''}`;
-    fitRanks();
+    let body;
+    if (modesTab === 'modes') {
+      body = `<div class="mode-grid">${MODES.map(m => `<button class="mode-card" data-mode="${m.id}" style="--c:${m.color}">
+        <canvas class="mode-art" data-art="${m.id}" width="320" height="180"></canvas>
+        <span class="mode-name tx">${m.name}</span>
+        <span class="mode-desc">${m.desc}</span>
+        <span class="mode-best tx">${m.best(save.modes[m.id] || 0)}</span>
+        <span class="mode-play tx">PLAY</span>
+      </button>`).join('')}</div>`;
+    } else {
+      const reset = new Date(); reset.setHours(24, 0, 0, 0);
+      const allClaimed = d.claimed.every(Boolean);
+      body = `<div class="daily-head tx">${icon('calendar', '#ff4d5e', 22)}Daily Challenges <small>New in ${fmtTime(reset - Date.now())}</small></div>
+        <div class="daily-list">${d.picks.map((pk, i) => {
+          const c = challengeDef(pk), cur = Math.min(pk.goal, d.prog[c.stat] || 0), done = cur >= pk.goal, rw = challengeReward(pk);
+          return `<div class="panel daily-row ${d.claimed[i] ? 'claimed' : done ? 'done' : ''}">
+            <span class="daily-ic">${icon(c.icon, '#ffc933', 34)}</span>
+            <div class="daily-mid"><div class="daily-text tx">${c.text(pk.goal)}</div>
+              <div class="daily-bar"><i style="width:${cur / pk.goal * 100}%"></i><span class="tx">${cur}/${pk.goal}</span></div></div>
+            ${d.claimed[i] ? '<span class="daily-ok tx">✓</span>'
+              : `<button class="btn ${done ? 'green' : 'grey'} daily-claim" data-claim="${i}" ${done ? '' : 'disabled'}>
+                  <span class="daily-rw tx">${icon('coin', '', 16)}${rw.coins}</span><span class="daily-rw tx">${icon('gem', '', 16)}${rw.gems}</span></button>`}
+          </div>`;
+        }).join('')}</div>
+        <div class="panel daily-bonus ${allClaimed && !d.bonus ? 'ready' : ''}">
+          <span class="daily-ic">${icon('chest', CHESTS[1].color, 44)}</span>
+          <div class="daily-mid"><div class="daily-text tx">Complete all 3</div><small>Bonus: ${CHESTS[1].name}</small></div>
+          ${d.bonus ? '<span class="daily-ok tx">✓</span>' : `<button class="btn ${allClaimed ? 'purple' : 'grey'}" id="daily-bonus" ${allClaimed ? '' : 'disabled'}><span class="tx">OPEN</span></button>`}
+        </div>`;
+    }
+    $('#screen-modes').innerHTML = `<div class="ribbon orange"><span class="tx">${modesTab === 'modes' ? 'Game Modes' : 'Challenges'}</span></div>${tabs}${body}`;
+    const scr = $('#screen-modes');
+    scr.querySelectorAll('[data-mtab]').forEach(b => b.addEventListener('click', () => { modesTab = b.dataset.mtab; render('modes'); }));
+    scr.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => startMode(b.dataset.mode)));
+    scr.querySelectorAll('[data-art]').forEach(cv => drawModeArt(cv.getContext('2d'), cv.dataset.art));
+    scr.querySelectorAll('[data-claim]').forEach(b => b.addEventListener('click', () => {
+      const i = +b.dataset.claim, pk = d.picks[i], rw = challengeReward(pk);
+      if (d.claimed[i] || (d.prog[challengeDef(pk).stat] || 0) < pk.goal) return;
+      d.claimed[i] = true; save.coins += rw.coins; save.gems += rw.gems; persist();
+      Sound.play('coin'); toast(`+${rw.coins} coins · +${rw.gems} gems`); render('modes');
+    }));
+    const bonus = $('#daily-bonus');
+    if (bonus) bonus.onclick = () => { if (!d.claimed.every(Boolean) || d.bonus) return; d.bonus = true; persist(); chestOpening(CHESTS[1], () => render('modes')); };
   }
 
-  // Show only the rows that fit, so the screen never scrolls.
-  function fitRanks() {
-    const list = $('#rank-list');
-    if (!list || tab !== 4) return;
-    while (list.lastElementChild && list.scrollHeight > list.clientHeight + 1) list.lastElementChild.remove();
+  function challengeDef(pk) { return CHALLENGE_POOL.find(c => c.id === pk.id); }
+
+  // Small illustration for each mode card.
+  function drawModeArt(c, id) {
+    const w = 320, h = 180;
+    const sky = c.createLinearGradient(0, 0, 0, h);
+    const cols = { touchline: ['#ff8a7a', '#ffd2b0'], survival: ['#5b3a9a', '#b98ae8'], extraction: ['#3aa0d8', '#bfeaff'], ammo: ['#d88a1a', '#ffe0a0'] }[id];
+    sky.addColorStop(0, cols[0]); sky.addColorStop(1, cols[1]);
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(0, h * 0.62, w, h);
+    if (id === 'touchline') {
+      c.fillStyle = '#8a8f9c'; c.beginPath(); c.moveTo(w * 0.35, h * 0.3); c.lineTo(w * 0.65, h * 0.3); c.lineTo(w, h); c.lineTo(0, h); c.fill();
+      c.strokeStyle = '#fff'; c.lineWidth = 7; c.setLineDash([16, 10]); c.beginPath(); c.moveTo(0, h * 0.86); c.lineTo(w, h * 0.86); c.stroke();
+      c.strokeStyle = '#ff3b3b'; c.lineDashOffset = 13; c.beginPath(); c.moveTo(0, h * 0.86); c.lineTo(w, h * 0.86); c.stroke(); c.setLineDash([]);
+      [[0.33, 0.62, 58], [0.55, 0.52, 44], [0.72, 0.66, 62], [0.45, 0.45, 34]].forEach(([x, y, s2], i) => drawZombie(c, w * x, h * y, s2 * 1.25, i, { seed: i * 0.2 }));
+      drawSoldierBack(c, w * 0.5, h * 0.99, 70, 0, 0, 'rifle');
+    } else if (id === 'survival') {
+      for (let i = 0; i < 9; i++) drawZombie(c, w * (0.1 + (i % 5) * 0.2 + (i > 4 ? 0.1 : 0)), h * (i > 4 ? 0.98 : 0.72), i > 4 ? 90 : 62, i * 0.7, { seed: i * 0.13, color: i === 2 ? '#e0763a' : undefined, spit: i === 2 });
+      drawZombie(c, w * 0.5, h * 0.6, 120, 0.3, { boss: true, color: '#7aa84a', shirt: '#4a4f66', wide: 1.2 });
+    } else if (id === 'extraction') {
+      c.fillStyle = 'rgba(40,45,60,.5)'; c.beginPath(); c.ellipse(w * 0.62, h * 0.85, 90, 26, 0, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#ffd23a'; c.lineWidth = 4; c.setLineDash([10, 6]); c.stroke(); c.setLineDash([]);
+      drawHeli(c, w * 0.62, h * 0.38, 120, 0.4, false);
+      drawZombie(c, w * 0.15, h * 0.95, 80, 0.2, { seed: 0.1 }); drawZombie(c, w * 0.9, h * 0.98, 84, 1.2, { seed: 0.3 });
+      drawSoldierFront(c, w * 0.36, h * 0.98, 84, 0);
+    } else {
+      [[0.2, 0.7], [0.82, 0.74]].forEach(([x, y]) => {
+        const bw = 34, bh = 46, X = w * x, Y = h * y;
+        c.fillStyle = '#e0303a'; c.strokeStyle = '#14132b'; c.lineWidth = 3; c.fillRect(X - bw / 2, Y - bh, bw, bh); c.strokeRect(X - bw / 2, Y - bh, bw, bh);
+        c.fillStyle = '#ffd23a'; c.beginPath(); c.moveTo(X, Y - bh * 0.7); c.lineTo(X + 9, Y - bh * 0.35); c.lineTo(X - 9, Y - bh * 0.35); c.closePath(); c.fill(); c.stroke();
+      });
+      drawZombie(c, w * 0.52, h * 0.78, 86, 0.4, { seed: 0.2 });
+      for (let i = 0; i < 3; i++) { c.save(); c.translate(w * (0.35 + i * 0.08), h * 0.22); c.rotate(0.3); c.fillStyle = '#ffd23a'; c.strokeStyle = '#14132b'; c.lineWidth = 3; c.beginPath(); c.roundRect ? c.roundRect(-7, -22, 14, 36, 7) : c.rect(-7, -22, 14, 36); c.fill(); c.stroke(); c.fillStyle = '#c98a2a'; c.fillRect(-7, 6, 14, 8); c.restore(); }
+      c.font = '900 30px "Lilita One", system-ui'; c.fillStyle = '#fff'; c.strokeStyle = '#14132b'; c.lineWidth = 6; c.strokeText('3', w * 0.72, h * 0.3); c.fillText('3', w * 0.72, h * 0.3);
+    }
+  }
+
+  function startMode(id) {
+    stopScene();
+    paused = false;
+    closeModal();
+    currentMode = id;
+    if (id === 'touchline' || id === 'survival') {
+      $('#game-view').hidden = false;
+      const hint = $('#hud-hint');
+      hint.style.animation = 'none'; void hint.offsetWidth; hint.style.animation = '';
+      Game.start(0, 0, onModeEnd, id);
+    } else {
+      $('#arena-view').hidden = false;
+      Arena.start(id, onModeEnd);
+    }
+  }
+
+  function onModeEnd(res) {
+    const m = MODES.find(x => x.id === res.mode);
+    const score = res.mode === 'extraction' ? (res.win ? res.coins : 0) : res.mode === 'ammo' ? res.time : res.waves;
+    const newBest = score > (save.modes[res.mode] || 0);
+    if (newBest) save.modes[res.mode] = score;
+    save.coins += res.coins; save.gems += res.gems;
+    if (res.chest) save.chests.push(res.chest);
+    persist();
+    const time = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const good = res.mode === 'extraction' ? res.win : score > 0;
+    const title = res.mode === 'extraction' ? (res.win ? 'Extracted!' : 'Mission Failed')
+      : res.mode === 'ammo' ? `Lasted ${time(res.time)}` : `Wave ${res.waves}`;
+    const lines = res.mode === 'extraction'
+      ? [['Time', time(res.time)], ['Supplies', res.found], ['Kills', res.kills]]
+      : res.mode === 'ammo' ? [['Time', time(res.time)], ['Kills', res.kills]]
+      : [['Waves cleared', res.waves], ['Kills', res.kills]].concat(res.mode === 'touchline' ? [['Breaches', `${res.breaches}/3`]] : []);
+    sheet(title, `
+      ${newBest && score ? '<div class="new-best tx">NEW BEST!</div>' : ''}
+      <div class="mode-result">${lines.map(([k, v]) => `<div><small>${k}</small><b class="tx">${v}</b></div>`).join('')}</div>
+      <div class="rewards">
+        <span class="reward tx">${icon('coin')}+${fmt(res.coins)}</span>
+        ${res.gems ? `<span class="reward tx">${icon('gem')}+${res.gems}</span>` : ''}
+        ${res.chest ? `<span class="reward tx">${icon('chest', CHESTS[1].color)}Silver Chest</span>` : ''}
+      </div>
+      ${res.mode === 'extraction' && !res.win ? '<p class="note">You only keep 25% of the loot if you don\'t make it out.</p>' : ''}
+      <div class="actions">
+        <button class="btn blue" id="m-modes"><span class="tx">Modes</span></button>
+        <button class="btn green" id="m-retry"><span class="tx">Play again</span></button>
+      </div>`, { ribbon: good ? m.ribbon : 'blue', cls: good ? '' : 'defeat' });
+    Sound.play('coin');
+    $('#m-modes').onclick = () => leaveGame(4);
+    $('#m-retry').onclick = () => startMode(res.mode);
   }
 
   function settings() {
@@ -746,6 +937,7 @@ const UI = (() => {
   // ---------- Level flow ----------
 
   function startLevel(ch, i) {
+    currentMode = null;
     stopScene();
     paused = false;
     closeModal();
@@ -759,10 +951,15 @@ const UI = (() => {
 
   function leaveGame(toTab = 2) {
     Game.quit();
+    Arena.quit();
     closeModal();
     $('#game-view').hidden = true;
+    $('#arena-view').hidden = true;
+    currentMode = null;
     setTab(toTab);
   }
+
+  const engine = () => $('#arena-view').hidden ? Game : Arena;
 
   // ---------- Support calls, unlocked by a rewarded ad ----------
 
@@ -928,16 +1125,17 @@ const UI = (() => {
     if (paused && !forceOn) {
       paused = false;
       closeModal();
-      Game.resume();
+      engine().resume();
       return;
     }
     if (paused) return;
+    if (!engine().debug()) return;
     paused = true;
-    Game.pause();
+    engine().pause();
     sheet('Paused', `<p>Take a breather. The horde will wait.</p>
       <div class="actions"><button class="btn red" id="m-quit"><span class="tx">Quit</span></button><button class="btn green" id="m-resume"><span class="tx">Resume</span></button></div>`, { ribbon: 'blue' });
     $('#m-resume').onclick = () => togglePause();
-    $('#m-quit').onclick = () => leaveGame();
+    $('#m-quit').onclick = () => leaveGame(currentMode ? 4 : 2);
   }
 
   function onLevelEnd(res) {
@@ -1035,7 +1233,7 @@ const UI = (() => {
   // ---------- Init ----------
 
   function init() {
-    const colors = { shop: '#ff5fb4', gear: '#5d8f46', play: '#ff8a1f', skills: '#ffc933', ranks: '#ffc933', heart: '#ff4d5e', skull: '#ffffff', helmet: '#2f8ff0' };
+    const colors = { shop: '#ff5fb4', gear: '#5d8f46', play: '#ff8a1f', skills: '#ffc933', ranks: '#ffc933', modes: '#2fb8e0', calendar: '#ff4d5e', rifle: '#ffe14d', heart: '#ff4d5e', skull: '#ffffff', helmet: '#2f8ff0' };
     document.querySelectorAll('[data-icon]').forEach(el => {
       const target = el.classList.contains('tab') ? el.querySelector('i') : el;
       target.innerHTML = icon(el.dataset.icon, colors[el.dataset.icon] || '#ffc933');
@@ -1043,6 +1241,8 @@ const UI = (() => {
     $('#hud-pause').innerHTML = icon('pause');
     $('#hud-mute').addEventListener('click', () => { save.settings.muted = !save.settings.muted; persist(); applySettings(); });
     $('#hud-pause').addEventListener('click', () => togglePause());
+    $('#ax-pause').innerHTML = icon('pause');
+    $('#ax-pause').addEventListener('click', () => togglePause());
     buildAbilities();
     document.querySelectorAll('.navbar .tab').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.goto)));
@@ -1052,7 +1252,7 @@ const UI = (() => {
       if (e.target.closest('button') && $('#game-view').hidden) Sound.play('click');
       else if (e.target.closest('.hud-pause, .sheet button')) Sound.play('click');
     });
-    window.addEventListener('resize', () => { fitInventory(); if (tab === 4) renderRanks(); });
+    window.addEventListener('resize', () => { fitInventory(); });
     // Screens slide with a transform; never let focus or scrollIntoView nudge them.
     const lockScroll = el => el.addEventListener('scroll', () => { el.scrollLeft = 0; el.scrollTop = 0; });
     lockScroll(document.querySelector('.screens'));
@@ -1072,6 +1272,7 @@ const UI = (() => {
     for (let c = CHAPTERS.length - 1; c >= 0; c--) if (chapterUnlocked(c)) { selectedChapter = c; break; }
     selectedLevel = Math.max(0, progress().unlocked - 1);
     Game.init();
+    Arena.init();
     setTab(2);
     if (document.fonts) document.fonts.ready.then(() => render(TAB_IDS[tab]));
   }

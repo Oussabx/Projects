@@ -274,18 +274,24 @@ const ZOMBIE_TYPES = {
   brute:    { hpMult: 26,  speed: 0.8, size: 1.9,  color: '#7aa84a', score: 150, mini: true, contact: 8 }, // Fat Brute miniboss
 };
 
-const BOT_NAMES = [
-  'ZedHunter', 'Sgt_Snow', 'CaptainCrunch', 'Nova', 'BulletBob', 'IceQueen', 'Rambo_Jr', 'FrostByte',
-  'Kobra', 'MissFire', 'TankYou', 'Dr.Boom', 'PvtPuddle', 'Ghost', 'Maverick', 'Luna', 'Blitz',
-  'SnowFox', 'Tiny', 'Major_Pain', 'Viper', 'Echo', 'Hawk', 'Bravo6', 'Pixel', 'Sarge', 'Rookie99',
-  'Zulu', 'Tango', 'Nomad', 'Pebbles', 'Shadow', 'Rex', 'Duke', 'Waffles', 'Onyx', 'Scout', 'Fury',
-  'Iceman', 'Blaze',
-];
-
 // In-level support calls. Each use costs one rewarded ad; there is no cooldown.
 const ABILITIES = [
   { id: 'air', name: 'Airstrike', icon: 'jet', color: '#ff8a1f', desc: 'A jet drops 4 bombs on the horde.' },
   { id: 'tank', name: 'Tank', icon: 'tank', color: '#7fb04e', desc: 'A tank rolls in, shelling and crushing zombies.' },
   { id: 'heli', name: 'Helicopter', short: 'Heli', icon: 'heli', color: '#4f9cf0', desc: 'A gunship rains bullets for 8 seconds.' },
   { id: 'freeze', name: 'Freeze', icon: 'freeze', color: '#8fe0ff', desc: 'Everything freezes solid for 4 seconds.' },
+];
+
+// Daily challenge pool: each day three are drawn; goals get harder with k.
+const CHALLENGE_POOL = [
+  { id: 'kills', stat: 'kills', goals: [150, 300, 500], text: n => `Defeat ${n} zombies`, icon: 'skull' },
+  { id: 'wins', stat: 'wins', goals: [1, 2, 3], text: n => `Win ${n} battle level${n > 1 ? 's' : ''}`, icon: 'play' },
+  { id: 'bosses', stat: 'bosses', goals: [1, 2, 3], text: n => `Defeat ${n} boss${n > 1 ? 'es' : ''}`, icon: 'skull' },
+  { id: 'survival', stat: 'survivalWave', max: true, goals: [5, 8, 12], text: n => `Reach wave ${n} in Survival`, icon: 'heart' },
+  { id: 'touchline', stat: 'touchWave', max: true, goals: [3, 5, 8], text: n => `Hold the Touchline for ${n} waves`, icon: 'helmet' },
+  { id: 'extract', stat: 'extracts', goals: [1, 2], text: n => `Extract ${n} time${n > 1 ? 's' : ''}`, icon: 'heli' },
+  { id: 'ammo', stat: 'ammoTime', max: true, goals: [60, 90, 120], text: n => `Survive ${n}s in Ammo Crisis`, icon: 'rifle' },
+  { id: 'support', stat: 'support', goals: [2, 4, 6], text: n => `Call in support ${n} times`, icon: 'jet' },
+  { id: 'chests', stat: 'chests', goals: [1, 2, 3], text: n => `Open ${n} chest${n > 1 ? 's' : ''} or crate${n > 1 ? 's' : ''}`, icon: 'chest' },
+  { id: 'merges', stat: 'merges', goals: [1, 2], text: n => `Merge gear ${n} time${n > 1 ? 's' : ''}`, icon: 'gear' },
 ];

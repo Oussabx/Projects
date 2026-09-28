@@ -34,7 +34,7 @@
         <section class="screen" id="screen-gear"></section>
         <section class="screen" id="screen-play"></section>
         <section class="screen" id="screen-skills"></section>
-        <section class="screen" id="screen-ranks"></section>
+        <section class="screen" id="screen-modes"></section>
       </div>
     </main>
 
@@ -43,7 +43,7 @@
       <button class="tab" data-tab="1" data-icon="gear"><i></i><span class="tab-label tx">Gear</span></button>
       <button class="tab" data-tab="2" data-icon="play"><i></i><span class="tab-label tx">Battle</span></button>
       <button class="tab" data-tab="3" data-icon="skills"><i></i><span class="tab-label tx">Skills</span></button>
-      <button class="tab" data-tab="4" data-icon="ranks"><i></i><span class="tab-label tx">Ranks</span></button>
+      <button class="tab" data-tab="4" data-icon="modes"><i></i><span class="tab-label tx">Modes</span></button>
     </nav>
 
     <div id="game-view" hidden>
@@ -77,6 +77,29 @@
       </div>
     </div>
 
+    <div id="arena-view" hidden>
+      <canvas id="arena-canvas"></canvas>
+      <div class="ahud">
+        <div class="ahud-xp"><div class="ahud-xp-fill" id="ax-xp"></div><span class="ahud-lvl tx" id="ax-lvl">Lv 1</span></div>
+        <div class="hud-top">
+          <div class="hud-hp">
+            <i class="hud-hp-icon" data-icon="heart"></i>
+            <div class="hud-hp-bar"><div class="hud-hp-fill" id="ax-hp"></div><span class="hud-hp-text tx" id="ax-hpText">100</span></div>
+          </div>
+          <div class="hud-pill"><i data-icon="skull"></i><span class="tx" id="ax-kills">0</span></div>
+          <button class="hud-pause" id="ax-pause" aria-label="Pause"></button>
+        </div>
+        <div class="ahud-row">
+          <span class="ahud-chip tx"><i data-icon="calendar"></i><span id="ax-time">0:00</span></span>
+          <span class="ahud-chip loot tx"><i data-icon="coin"></i><span id="ax-loot">0</span></span>
+          <span class="ahud-chip ammo tx" id="ax-ammo" hidden><i data-icon="rifle"></i><span>30</span></span>
+        </div>
+        <div class="ahud-obj tx" id="ax-obj"></div>
+        <div class="ahud-banner" id="ax-banner" hidden></div>
+      </div>
+      <div class="ahud-levelup" id="ax-levelup" hidden></div>
+    </div>
+
     <div id="modal" class="modal" hidden></div>
     <div class="ad-view" id="ad-view" hidden>
         <div class="ad-top"><span class="ad-tag tx">AD</span><span class="ad-timer tx" id="ad-timer"></span><button class="ad-close" id="ad-close" aria-label="Close ad">✕</button></div>
@@ -91,6 +114,7 @@
   <script src="js/art.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/arena.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

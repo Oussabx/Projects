@@ -100,17 +100,34 @@ const Game = (() => {
 
   // ---------- Run lifecycle ----------
 
-  function start(chIdx, lvlIdx, endCallback) {
-    const cfg = CHAPTERS[chIdx].levels[lvlIdx];
+  // Endless modes are tuned to the player's progress: they start from the level just before the frontier.
+  function modeBase() {
+    let gl = 0;
+    CHAPTERS.forEach((c, ci) => { if (chapterUnlocked(ci)) gl = Math.max(gl, ci * 6 + save.progress[c.id].unlocked - 1); });
+    gl = Math.max(0, gl - 1);
+    return { gl, ch: Math.floor(gl / 6), lvl: gl % 6 };
+  }
+
+  // mode: null for a chapter level, or 'touchline' / 'survival' (endless waves on the same road).
+  function start(chIdx, lvlIdx, endCallback, mode = null) {
+    let cfg;
+    if (mode) {
+      const b = modeBase();
+      chIdx = b.ch; lvlIdx = b.lvl;
+      const src = CHAPTERS[chIdx].levels[lvlIdx];
+      cfg = { ...src, types: src.types.slice(), boss: { ...src.boss } };
+    } else cfg = CHAPTERS[chIdx].levels[lvlIdx];
     const stats = playerStats();
     onEnd = endCallback;
     run = {
-      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, len: Math.round(cfg.length * 0.3), theme: CHAPTERS[chIdx].theme,
+      mode, wave: 0, wavesDone: 0, waveBreak: 2.2, waveLeft: 0, waveTotal: 1, waveSpawnT: 0, waveGap: 1, breaches: 0,
+      baseZhp: cfg.zhp, baseZdmg: cfg.zdmg, baseGl: chIdx * 6 + lvlIdx,
+      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, len: mode ? Infinity : Math.round(cfg.length * 0.3), theme: CHAPTERS[chIdx].theme,
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
       weapon: equippedWeapon(), leaderCd: 0.2, trickle: 3,
-      squad: 6 + Math.max(0, 4 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
+      squad: mode ? 12 : 6 + Math.max(0, 4 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
@@ -121,10 +138,10 @@ const Game = (() => {
       banner: null,
       strikes: [], jet: null, tank: null, heli: null, frozen: 0,
     };
-    hud.level.textContent = `${chIdx + 1}-${lvlIdx + 1} · ${cfg.name}`;
+    hud.level.textContent = mode ? MODE_TITLES[mode] : `${chIdx + 1}-${lvlIdx + 1} · ${cfg.name}`;
     hud.boss.hidden = true;
     for (let z = 0; z < Z_FAR; z += 5) spawnProp(z);
-    showBanner('ZOMBIES INCOMING', 2);
+    showBanner(mode === 'touchline' ? 'HOLD THE LINE' : mode ? 'SURVIVE!' : 'ZOMBIES INCOMING', 2);
     Sound.setMode('battle');
     resize();
     last = performance.now();
@@ -144,6 +161,21 @@ const Game = (() => {
 
   function finish(win) {
     const r = run;
+    if (r.mode) {
+      // Endless modes: score is the number of waves cleared.
+      const waves = r.wavesDone;
+      const coins = r.kills + waves * 40;
+      const gems = Math.floor(waves / 3) * 5;
+      cancelAnimationFrame(raf);
+      Sound.setMode('menu');
+      Sound.play(waves > 0 ? 'victory' : 'defeat');
+      track('kills', r.kills);
+      track(r.mode === 'survival' ? 'survivalWave' : 'touchWave', waves, 'max');
+      const cb = onEnd;
+      run = null;
+      cb({ mode: r.mode, waves, kills: r.kills, coins, gems, breaches: r.breaches });
+      return;
+    }
     const hpPct = Math.max(0, r.hp) / r.maxHp;
     const keep = Math.min(hpPct, (r.squad + 1) / (r.squadPeak + 1) * 1.5);
     const stars = win ? (keep > 0.7 ? 3 : keep > 0.35 ? 2 : 1) : 0;
@@ -152,6 +184,8 @@ const Game = (() => {
     cancelAnimationFrame(raf);
     Sound.setMode('menu');
     Sound.play(win ? 'victory' : 'defeat');
+    track('kills', r.kills);
+    if (win) { track('wins', 1); track('bosses', 1); }
     const cb = onEnd;
     run = null;
     cb({ win, chIdx: r.chIdx, lvlIdx: r.lvlIdx, kills: r.kills, coins, stars, score, squad: r.squad, reached: r.dist / r.len });
@@ -247,7 +281,7 @@ const Game = (() => {
     const xs = both ? [-0.5, 0.5] : [rand(-0.6, 0.6)];
     for (const x of xs) {
       const roll = Math.random();
-      const drop = roll < 0.5 ? 'squad' : roll < 0.58 ? 'minigun' : roll < 0.66 ? 'rocket' : pick(['shield', 'rage', 'medkit', 'grenade', 'coins']);
+      const drop = roll < 0.5 ? 'squad' : roll < 0.58 ? 'minigun' : roll < 0.66 ? 'rocket' : pick(['shield', 'rage', 'medkit', 'grenade']);
       const base = drop === 'squad' ? 1.3 : drop === 'minigun' || drop === 'rocket' ? 1.7 : 1;
       const hp = Math.round((55 + run.gl * 60) * base * rand(0.8, 1.6) / 10) * 10;
       const gain = Math.round(rand(3, 6) + run.gl * 1.0 + Math.max(0, 3 - run.gl) * 1.5);
@@ -263,7 +297,7 @@ const Game = (() => {
         { type: 'mult', val: 2 },
         { type: 'drop', drop: 'minigun', val: 1 }, { type: 'drop', drop: 'rocket', val: 1 },
         { type: 'drop', drop: 'shield', val: 1 }, { type: 'drop', drop: 'rage', val: 1 },
-        { type: 'drop', drop: 'grenade', val: 1 }, { type: 'drop', drop: 'coins', val: 1 },
+        { type: 'drop', drop: 'grenade', val: 1 },
         { type: 'heal', val: 30 },
         { type: 'dmg', val: Math.round(rand(15, 40)) },
         { type: 'rate', val: Math.round(rand(15, 40)) },
@@ -285,7 +319,7 @@ const Game = (() => {
     let b = gateOption(supply || Math.random() < (run.gl < 2 ? 0.25 : 0.45));
     if (!supply && b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
-    const hpFor = o => o.val >= 0 ? Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5 : 0;
+    const hpFor = o => o.val < 0 ? Math.round((40 + run.gl * 45) * rand(0.85, 1.15) / 5) * 5 : Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5;
     run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
   }
 
@@ -315,6 +349,69 @@ const Game = (() => {
     hud.bossName.textContent = b.name;
     hud.boss.hidden = false;
     showBanner(b.final ? 'FINAL BOSS' : 'BOSS INCOMING', 2.2, 'boss');
+  }
+
+  // ---------- Endless waves (Touchline / Survival) ----------
+
+  const MODE_TITLES = { touchline: 'TOUCHLINE', survival: 'SURVIVAL' };
+  const TOUCH_LIVES = 3;
+
+  function startWave() {
+    const r = run, w = ++r.wave;
+    r.cfg.zhp = r.baseZhp * (1 + 0.14 * (w - 1));
+    r.cfg.zdmg = r.baseZdmg * (1 + 0.06 * (w - 1));
+    r.gl = r.baseGl + Math.floor((w - 1) / 3);      // more specials join as the waves climb
+    r.waveLeft = r.waveTotal = r.mode === 'touchline' ? 8 + w * 3 : 10 + w * 4;
+    r.waveGap = Math.max(0.35, (r.mode === 'touchline' ? 1.25 : 1.05) - w * 0.04);
+    r.waveSpawnT = 0.4;
+    const boss = r.mode === 'survival' && w % 10 === 0;
+    const elite = w % 5 === 0 && !boss;
+    if (boss) {
+      r.cfg.boss = { ...r.cfg.boss, hp: r.cfg.boss.hp * (0.6 + w * 0.04) };
+      spawnBoss();
+    }
+    if (elite) {
+      // Elite wave: a Fat Brute escorted by armored zombies.
+      spawnZombie(0, 21, 'brute');
+      for (const x of [-0.72, 0.72, -0.36, 0.36]) spawnZombie(x, rand(17, 21), 'armored');
+    }
+    hud.level.textContent = `${MODE_TITLES[r.mode]} · WAVE ${w}`;
+    showBanner(boss ? `WAVE ${w} · BOSS` : elite ? `WAVE ${w} · ELITES` : `WAVE ${w}`, 1.6, boss || elite ? 'boss' : '');
+  }
+
+  function updateWaves(dt) {
+    const r = run;
+    if (r.waveBreak > 0) {
+      r.waveBreak -= dt;
+      if (r.waveBreak <= 0) startWave();
+    } else {
+      if (r.waveLeft > 0 && (r.waveSpawnT -= dt) <= 0) {
+        r.waveSpawnT = r.waveGap * rand(0.7, 1.3);
+        const n0 = r.zombies.length;
+        spawnSingle(rand(18, 22));
+        r.waveLeft -= Math.max(1, r.zombies.length - n0);
+      }
+      if (r.waveLeft <= 0 && !r.zombies.length && !(r.boss && r.boss.hp > 0)) {
+        r.wavesDone = r.wave;
+        r.waveBreak = 3;
+        addSquad(3 + Math.floor(r.wave / 2));
+        showBanner(`WAVE ${r.wave} CLEARED`, 1.4, 'good');
+      }
+    }
+    // Soldier and power-up signs keep coming between the zombies.
+    while (r.nextGate < r.dist + Z_FAR) { spawnGate(r.nextGate - r.dist); r.nextGate += rand(9, 13); }
+  }
+
+  // Touchline: a zombie that slips past the squad crosses the line.
+  function breach(z) {
+    const r = run;
+    r.breaches++;
+    r.hurt = 0.5; r.shake = 0.3;
+    Sound.play('gateBad');
+    const p = proj(z.x, -0.3);
+    addText(p.x, p.y - 30, 'BREACH!', '#ff4a4a', 26, 1.2);
+    if (r.breaches >= TOUCH_LIVES) { r.hp = 0; showBanner('THE LINE FELL', 1.2, 'boss'); }
+    else showBanner(`BREACH ${r.breaches}/${TOUCH_LIVES}`, 1, 'boss');
   }
 
   // ---------- Update ----------
@@ -352,7 +449,9 @@ const Game = (() => {
     const move = r.speed * dt;
     r.dist += move;
 
-    if (!inBoss) {
+    if (r.mode) {
+      updateWaves(dt);
+    } else if (!inBoss) {
       while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len + 6) {
         const z = r.nextSpawn - r.dist;
         const supply = r.nextSpawn > r.len - 14 && !r.supplyDone;
@@ -505,11 +604,12 @@ const Game = (() => {
       for (const gt of r.gates) {
         if (b.rocket ? !(b.z >= gt.z && prevZ < gt.z + 0.4) : !(prevZ < gt.z && b.z >= gt.z)) continue;
         const sd = gt.sides.find(sd => sd.side === (b.x < 0 ? -1 : 1));
-        if (!sd || sd.broken || sd.val < 0 || Math.abs(b.x) > 0.97) continue;
+        if (!sd || sd.broken || Math.abs(b.x) > 0.97) continue;
+        if (sd.flipT > 0) { hit = true; break; }     // mid-flip: soaks bullets
         const { dmg } = bulletDamage(b.rocket ? b.m * 2 : b.m);
         sd.hp -= dmg; sd.flash = 0.06;
         Sound.play('hit');
-        if (sd.hp <= 0) breakGate(gt, sd);
+        if (sd.hp <= 0) sd.val < 0 ? flipGate(gt, sd) : breakGate(gt, sd);
         hit = true;
         break;
       }
@@ -588,6 +688,7 @@ const Game = (() => {
   function useAbility(id) {
     const r = run;
     if (!abilityReady(id)) return false;
+    track('support', 1);
     const P = supportPower();
     if (id === 'air') {
       r.jet = { t: 0, dur: 1.5 };
@@ -739,6 +840,14 @@ const Game = (() => {
       if (t.acc) { const p = proj(t.x, t.z); addText(p.x, p.y - 0.75 * roadW * p.s, `-${fmtN(t.acc)}`, '#ffb02e', 20); t.acc = 0; }
       Sound.play('explode');
       applyDrop(t.drop, t);
+    } else if (t === r.boss && r.mode) {
+      burst(t.x, t.z, t.color, 60);
+      r.kills += 20;
+      r.boss = null;
+      hud.boss.hidden = true;
+      addSquad(10);
+      showBanner('BOSS DEFEATED', 1.4, 'good');
+      Sound.play('explode');
     } else if (t === r.boss) {
       burst(t.x, t.z, t.color, 60);
       r.kills += 20;
@@ -881,6 +990,9 @@ const Game = (() => {
         burst(z.x, z.z, z.color, z.mini ? 30 : 8);
         if (z.bomb || z.mini) { burst(z.x, z.z, '#ffb02e', 20); Sound.play('explode'); r.shake = 0.35; }
         r.zombies.splice(i, 1);
+      } else if (r.mode === 'touchline' && z.z < -0.6 && !z.burrowed) {
+        r.zombies.splice(i, 1);
+        breach(z);
       } else if (z.z < -1.5) {
         r.zombies.splice(i, 1);
       }
@@ -938,7 +1050,7 @@ const Game = (() => {
     for (let i = r.gates.length - 1; i >= 0; i--) {
       const g = r.gates[i];
       g.z -= move;
-      for (const sd of g.sides) sd.flash = Math.max(0, sd.flash - 1 / 60);
+      for (const sd of g.sides) { sd.flash = Math.max(0, sd.flash - 1 / 60); if (sd.flipT) sd.flipT = Math.max(0, sd.flipT - 1 / 60); }
       if (g.z <= 0.2) {
         // Walking into a red sign still costs you; blue ones only pay out when shot to pieces.
         const s = g.sides.find(s => s.side === (r.x < 0 ? -1 : 1));
@@ -948,6 +1060,24 @@ const Game = (() => {
         if (g.sides.every(sd => sd.broken)) r.gates.splice(i, 1);
       }
     }
+  }
+
+  // Shooting a red sign to 0 turns it into the matching blue power-up, which can then be shot open.
+  function flipGate(gt, sd) {
+    const r = run;
+    sd.val = -sd.val;
+    sd.maxHp = Math.round((45 + r.gl * 55) / 5) * 5;
+    sd.hp = sd.maxHp;
+    sd.flash = 0.25;
+    sd.flipT = 0.5;
+    const p = proj(sd.side * 0.5, gt.z);
+    for (let k = 0; k < 14; k++) {
+      const a = rand(-Math.PI, 0), sp = rand(120, 300) * (0.5 + p.s * 0.5);
+      r.fx.push({ type: 'plank', sx: p.x + rand(-30, 30) * p.s, sy: p.y - 0.25 * roadW * p.s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, rot: rand(0, 6), vr: rand(-12, 12),
+        w: rand(8, 14) * (0.4 + p.s * 0.6), h: rand(6, 9) * (0.4 + p.s * 0.6), color: pick(['#ff7a7a', '#ffb3b3', '#e0243a']), t: 0.6, max: 0.6 });
+    }
+    addText(p.x, p.y - 0.7 * roadW * p.s, 'FLIPPED!', '#6fd3ff', 20, 0.9);
+    Sound.play('gateGood');
   }
 
   function breakGate(gt, sd) {
@@ -1249,6 +1379,20 @@ const Game = (() => {
     ctx.save();
     if (r.shake > 0) ctx.translate(rand(-5, 5) * r.shake * 4, rand(-5, 5) * r.shake * 4);
     drawGround();
+    if (r.mode === 'touchline') {
+      // The line the squad must hold
+      const a = proj(-1.05, -0.6), b = proj(1.05, -0.6);
+      const pulse = 0.65 + 0.35 * Math.sin(r.t * 5);
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = `rgba(255,60,60,${0.35 * pulse})`; ctx.lineWidth = 16;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.setLineDash([22, 14]); ctx.lineDashOffset = -r.t * 30;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#ff3b3b'; ctx.lineDashOffset = -r.t * 30 + 18;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.restore();
+    }
 
     // Boss rock target markers on the ground
     for (const k of r.rocks) {
@@ -1358,6 +1502,8 @@ const Game = (() => {
     // Support aircraft fly above everything on the road.
     if (r.heli) {
       const hl = r.heli, p = proj(hl.x, hl.z);
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.45 * XS * roadW * p.s, 0.12 * roadW * p.s, 0, 0, Math.PI * 2); ctx.fill();
       drawHeli(ctx, p.x, p.y - 1.25 * roadW * p.s - Math.sin(r.t * 2) * 4, 0.9 * roadW * p.s, r.t, hl.t < hl.dur && hl.z > 1);
     }
     if (r.jet) {
@@ -1616,7 +1762,10 @@ const Game = (() => {
       const h = 0.5 * roadW * a.s;
       const good = s.val >= 0;
       if (s.broken) continue;
-      drawGate(ctx, a.x, b.x, a.y, h, gateLabel(s), good, good ? { frac: s.hp / s.maxHp, text: fmtN(Math.max(0, Math.ceil(s.hp))), flash: s.flash } : null);
+      // Flip animation: the sign squashes and pops back as it turns blue.
+      const fk = s.flipT ? Math.abs(Math.cos((1 - s.flipT / 0.5) * Math.PI)) : 1;
+      const mid = (a.x + b.x) / 2, hw = (b.x - a.x) / 2 * Math.max(0.08, fk);
+      drawGate(ctx, mid - hw, mid + hw, a.y, h, gateLabel(s), s.flipT > 0.25 ? false : good, { frac: s.hp / s.maxHp, text: fmtN(Math.max(0, Math.ceil(s.hp))), flash: s.flash });
       const cx = (a.x + b.x) / 2, topY = a.y - h - 0.08 * roadW * a.s, sz = 0.42 * roadW * a.s;
       if (s.type === 'drop') {
         if (s.drop === 'minigun' || s.drop === 'rocket') drawWeaponSide(ctx, s.drop, cx, topY - sz * 0.2, sz * 1.5, { rot: -0.15 });
@@ -1664,7 +1813,8 @@ const Game = (() => {
     hud.hpFill.style.width = `${pct * 100}%`;
     hud.hpFill.classList.toggle('low', pct < 0.3);
     hud.hpText.textContent = `${Math.ceil(Math.max(0, r.hp))}`;
-    hud.prog.style.width = `${Math.min(1, r.dist / r.len) * 100}%`;
+    const prog = r.mode ? (r.waveBreak > 0 ? 1 : Math.min(1, (r.waveTotal - r.waveLeft - r.zombies.length) / r.waveTotal)) : r.dist / r.len;
+    hud.prog.style.width = `${Math.max(0, Math.min(1, prog)) * 100}%`;
     hud.kills.textContent = r.squad;
     if (r.boss) {
       const bp = Math.max(0, r.boss.hp);
@@ -1681,6 +1831,7 @@ const Game = (() => {
     if (Math.abs(r.rateMult - 1) > 0.01) chip(r.rateMult < 1 ? 'bad' : '', 'fire', '#ffc933', `${Math.round(r.rateMult * 100)}%`);
     if (r.shield > 0) chip('shield', 'helmet', '#8fd2ff', `${Math.ceil(r.shield)}s`);
     if (r.rage > 0) chip('rage', 'fire', '#ff4d5e', `${Math.ceil(r.rage)}s`);
+    if (r.mode === 'touchline') chip(r.breaches ? 'bad' : '', 'heart', '#ff4d5e', `LINE ${TOUCH_LIVES - r.breaches}/${TOUCH_LIVES}`);
     const html = chips.join('');
     if (html !== lastBuffs) { hud.buffs.innerHTML = html; lastBuffs = html; }
 
