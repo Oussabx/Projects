@@ -1113,6 +1113,54 @@ function drawBoss(ctx, cx, footY, height, t, opts = {}) {
   ctx.restore();
 }
 
+// Circular saw half-sunk in a floor slot, spinning, throwing sparks. blood: 0..1 after it hits the squad.
+function drawSaw(ctx, x, footY, R, t, blood = 0) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x - R * 1.6, footY - R * 2.4, R * 3.2, R * 2.4 + R * 0.05); ctx.clip();
+  const cy = footY + R * 0.28;
+  ctx.save();
+  ctx.translate(x, cy);
+  ctx.rotate(t * 16);
+  const n = 18;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2, b = (i + 0.55) / n * Math.PI * 2, c = (i + 1) / n * Math.PI * 2;
+    ctx.lineTo(Math.cos(a) * R * 0.84, Math.sin(a) * R * 0.84);
+    ctx.lineTo(Math.cos(b) * R * 1.04, Math.sin(b) * R * 1.04);
+    ctx.lineTo(Math.cos(c) * R * 0.86, Math.sin(c) * R * 0.86);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#b8c0cc'; ctx.fill();
+  ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, R * 0.06); ctx.stroke();
+  const g = ctx.createRadialGradient(-R * 0.3, -R * 0.3, R * 0.05, 0, 0, R * 0.86);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, '#c9d0da'); g.addColorStop(1, '#6a727e');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R * 0.82, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(20,19,43,.5)'; ctx.lineWidth = Math.max(1, R * 0.03);
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, Math.PI * 2); ctx.stroke();
+  if (blood > 0) {
+    ctx.fillStyle = `rgba(170,20,30,${0.75 * blood})`;
+    for (let k = 0; k < 5; k++) { const a = k * 1.3; ctx.beginPath(); ctx.ellipse(Math.cos(a) * R * 0.55, Math.sin(a) * R * 0.55, R * 0.16, R * 0.08, a, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.fillStyle = '#2d3140';
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.42, Math.sin(a) * R * 0.42, R * 0.08, 0, Math.PI * 2); ctx.fill(); }
+  ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, Math.PI * 2); ctx.fillStyle = '#e0303a'; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, R * 0.05); ctx.stroke();
+  ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.arc(0, 0, R * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // Speed blur on the rim
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = Math.max(1.5, R * 0.08);
+  ctx.beginPath(); ctx.arc(x, cy, R * 0.94, Math.PI * 1.1, Math.PI * 1.55); ctx.stroke();
+  ctx.restore();
+  // Sparks where the blade meets the slot
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 5; k++) {
+    const sd = Math.random() < 0.5 ? -1 : 1, ax = x + sd * R * (0.5 + Math.random() * 0.3), len = R * (0.3 + Math.random() * 0.5);
+    ctx.strokeStyle = Math.random() < 0.5 ? '#ffe14d' : '#ffb02e'; ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.beginPath(); ctx.moveTo(ax, footY - R * 0.05); ctx.lineTo(ax + sd * len, footY - len * 0.7); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // ---------- Props ----------
 
 function drawBarrel(ctx, cx, footY, w, h, hp) {

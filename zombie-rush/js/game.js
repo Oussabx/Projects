@@ -132,7 +132,7 @@ const Game = (() => {
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
       zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [], fireballs: [], bolts: [],
-      nextSpawn: 9, nextGate: 14, nextProp: 0,
+      nextSpawn: 9, nextGate: 10, nextProp: 0, nextSaw: 18, saws: [],
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
@@ -240,7 +240,7 @@ const Game = (() => {
 
   function spawnZombie(x, z, type, gid = 0, fixedSpeed = 0) {
     const zt = ZOMBIE_TYPES[type];
-    const hp = Math.round(run.cfg.zhp * zt.hpMult * 3);   // fewer, individual zombies, so each one is tougher
+    const hp = Math.round(run.cfg.zhp * zt.hpMult * 3.25);   // fewer, individual zombies, so each one is tougher
     const zb = {
       gid, acc: 0, accT: 0, seed: Math.random() * 10,
       type, x, z, hp, maxHp: hp, speed: fixedSpeed || zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
@@ -320,7 +320,7 @@ const Game = (() => {
     if (!supply && b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     const hpFor = o => o.val < 0 ? Math.round((40 + run.gl * 45) * rand(0.85, 1.15) / 5) * 5 : Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5;
-    run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
+    run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, base: o.val, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
   }
 
   function gateLabel(g) {
@@ -349,6 +349,50 @@ const Game = (() => {
     hud.bossName.textContent = b.name;
     hud.boss.hidden = false;
     showBanner(b.final ? 'FINAL BOSS' : 'BOSS INCOMING', 2.2, 'boss');
+  }
+
+  // ---------- Chainsaws ----------
+  // Spinning blades in floor slots. Some slide back and forth. Touching one saws half the squad.
+
+  function spawnSaw(z) {
+    const r = run;
+    const moving = Math.random() < (r.gl >= 1 ? 0.6 : 0.35);
+    const span = moving ? rand(0.3, 0.6) : 0;
+    const cx = moving ? rand(-0.85 + span, 0.85 - span) : pick(LANES);
+    // Keep saws off the sign rows.
+    for (const g of r.gates) if (Math.abs(g.z - z) < 1.6) z = g.z + 1.8;
+    r.saws.push({ z, x: cx, x0: cx - span, x1: cx + span, vx: moving ? rand(0.35, 0.6) * (Math.random() < 0.5 ? -1 : 1) : 0, t: rand(0, 5), hit: false, blood: 0 });
+  }
+
+  function updateSaws(dt, move) {
+    const r = run;
+    for (let i = r.saws.length - 1; i >= 0; i--) {
+      const s = r.saws[i];
+      s.z -= move; s.t += dt;
+      s.blood = Math.max(0, s.blood - dt * 0.3);
+      if (s.vx) {
+        s.x += s.vx * dt;
+        if (s.x < s.x0) { s.x = s.x0; s.vx = Math.abs(s.vx); }
+        if (s.x > s.x1) { s.x = s.x1; s.vx = -Math.abs(s.vx); }
+      }
+      if (!s.hit && Math.abs(s.z) < 0.35) {
+        const nearLeader = Math.abs(s.x - r.x) < 0.2;
+        const nearSquad = r.squad > 0 && Math.abs(s.x - r.cx) < r.hw + 0.12;
+        if (nearLeader || nearSquad) {
+          s.hit = true; s.blood = 1;
+          if (r.squad > 0) {
+            const lost = Math.ceil(r.squad / 2);
+            loseSoldiers(lost, s.x, -0.4);
+            const p = proj(s.x, 0);
+            addText(p.x, p.y - roadW * 0.9, `SAWED! -${lost}`, '#ff4a4a', 26, 1.2);
+          } else hurtPlayer(r.maxHp * 0.35);
+          burst(s.x, 0, '#ff3b3b', 26); burst(s.x, 0, '#ffd23a', 14);
+          r.shake = Math.max(r.shake, 0.4);
+          Sound.play('explode');
+        }
+      }
+      if (s.z < -2) r.saws.splice(i, 1);
+    }
   }
 
   // ---------- Endless waves (Touchline / Survival) ----------
@@ -399,7 +443,8 @@ const Game = (() => {
       }
     }
     // Soldier and power-up signs keep coming between the zombies.
-    while (r.nextGate < r.dist + Z_FAR) { spawnGate(r.nextGate - r.dist); r.nextGate += rand(9, 13); }
+    while (r.nextGate < r.dist + Z_FAR) { spawnGate(r.nextGate - r.dist); r.nextGate += rand(7, 10); }
+    while (r.nextSaw < r.dist + Z_FAR) { spawnSaw(r.nextSaw - r.dist); r.nextSaw += rand(16, 24); }
   }
 
   // Touchline: a zombie that slips past the squad crosses the line.
@@ -445,6 +490,8 @@ const Game = (() => {
 
     // Forward motion; stop for the boss fight.
     const inBoss = r.dist >= r.len;
+    // Levels start slow and speed up, so late signs are harder to line up.
+    if (!inBoss && !r.mode) r.speed = RUN_SPEED * (0.7 + 1.0 * Math.min(1, r.dist / r.len));
     if (inBoss) r.speed = Math.max(0, r.speed - dt * 8);
     const move = r.speed * dt;
     r.dist += move;
@@ -458,8 +505,12 @@ const Game = (() => {
         if (r.nextSpawn >= r.nextGate || supply) {
           spawnGate(z, supply);
           if (supply) r.supplyDone = true;
-          r.nextGate += rand(8, 11);
+          r.nextGate += rand(5.5, 7.5);
         } else spawnSingle(z);
+        if (r.nextSpawn >= r.nextSaw && r.nextSpawn < r.len - 8) {
+          spawnSaw(z + 1.2);
+          r.nextSaw += rand(15, 22) - Math.min(6, r.gl * 0.5);
+        }
         r.nextSpawn += rand(1.6, 2.6) / r.cfg.density;
       }
       // Fat Brute miniboss halfway through (from level 2).
@@ -493,6 +544,7 @@ const Game = (() => {
     }
 
     updateSupport(dt, move);
+    updateSaws(dt, move);
     updateBullets(dt);
     updateZombies(dt, move);
     updateBarrels(move);
@@ -608,6 +660,7 @@ const Game = (() => {
         if (sd.flipT > 0) { hit = true; break; }     // mid-flip: soaks bullets
         const { dmg } = bulletDamage(b.rocket ? b.m * 2 : b.m);
         sd.hp -= dmg; sd.flash = 0.06;
+        shiftGate(sd);
         Sound.play('hit');
         if (sd.hp <= 0) sd.val < 0 ? flipGate(gt, sd) : breakGate(gt, sd);
         hit = true;
@@ -1062,10 +1115,19 @@ const Game = (() => {
     }
   }
 
+  // Shots visibly change a sign's number: red counts up toward zero, blue grows while it's shot open.
+  const GROWS = { squad: 1, dmg: 1, rate: 1, heal: 1 };
+  function shiftGate(sd) {
+    if (!GROWS[sd.type] || sd.hp <= 0) return;
+    const f = clamp(1 - sd.hp / sd.maxHp, 0, 1);
+    const v = sd.base < 0 ? Math.min(-1, Math.round(sd.base * (1 - f))) : Math.round(sd.base * (1 + 0.6 * f));
+    if (v !== sd.val) { sd.val = v; sd.flash = 0.12; }
+  }
+
   // Shooting a red sign to 0 turns it into the matching blue power-up, which can then be shot open.
   function flipGate(gt, sd) {
     const r = run;
-    sd.val = -sd.val;
+    sd.val = sd.base = Math.abs(sd.base ?? sd.val);
     sd.maxHp = Math.round((45 + r.gl * 55) / 5) * 5;
     sd.hp = sd.maxHp;
     sd.flash = 0.25;
@@ -1403,6 +1465,20 @@ const Game = (() => {
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.3 * roadW, 0.09 * roadW, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    // Chainsaw slots
+    for (const sw of r.saws) {
+      if (sw.z < -1.5 || sw.z > Z_FAR) continue;
+      const a = proj(sw.x0 - 0.14, sw.z), b = proj(sw.x1 + 0.14, sw.z);
+      const w = Math.max(3, 0.07 * roadW * a.s);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#14132b'; ctx.lineWidth = w + 5;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#2d3140'; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#ffc933'; ctx.lineWidth = Math.max(1.5, w * 0.3); ctx.setLineDash([w * 1.2, w * 1.2]);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y - w * 0.9); ctx.lineTo(b.x, b.y - w * 0.9); ctx.stroke(); ctx.setLineDash([]);
+    }
+
     // Airstrike targets: shrinking crosshair rings
     for (const s of r.strikes) {
       const p = proj(s.x, s.z), k = s.t / s.max;
@@ -1429,6 +1505,7 @@ const Game = (() => {
     for (const z of r.zombies) list.push({ z: z.z, fn: () => drawOneZombie(z) });
     for (const f of r.fireballs) list.push({ z: f.z, fn: () => { const p = proj(f.x, f.z); drawFireball(ctx, p.x, p.y - 0.28 * roadW * p.s, Math.max(6, 0.13 * roadW * p.s), r.t + f.t); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
+    for (const sw of r.saws) if (sw.z > -1.5) list.push({ z: sw.z, fn: () => { const p = proj(sw.x, sw.z); drawSaw(ctx, p.x, p.y, 0.42 * roadW * p.s, sw.t, sw.blood); } });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
       list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawBoss(ctx, p.x, p.y, 0.8 * b.size * roadW * p.s, b.t, { color: r.frozen > 0 ? '#bfe8ff' : b.color, flash: b.flash, name: b.name, final: b.final, rage: !!b.raged }); } });
