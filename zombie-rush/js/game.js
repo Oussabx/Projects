@@ -208,7 +208,7 @@ const Game = (() => {
       gid, acc: 0, accT: 0, seed: Math.random() * 10,
       type, x, z, hp, maxHp: hp, speed: fixedSpeed || zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
       color: zombieSkin(type, zt), score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
-      shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
+      shirt: pick(['#d8c8a8', '#cdbb97', '#e2d6bc', '#c9b48e']),   // worn beige tees
       spit: !!zt.spit, hop: !!zt.hop, scream: !!zt.scream, dig: !!zt.dig, mini: !!zt.mini, zap: !!zt.zap, zapCd: rand(0.6, 1.5),
       burrowed: !!zt.dig, spitCd: rand(0.4, 1.2), hopCd: rand(1.2, 2.2), hopT: -1, hopFrom: x, hopTo: x, screamT: rand(0, 2),
     };
