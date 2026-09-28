@@ -115,7 +115,7 @@ const Arena = (() => {
     onEnd = endCallback;
     run = {
       mode, theme, stats, wpn, weapon: equippedWeapon(), gl, t: 0, state: 'playing', endTimer: 0, win: false,
-      p: { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, face: 1, hurt: 0, flash: 0, walk: 0 },
+      p: { x: WORLD / 2, y: WORLD / 2, vx: 0, vy: 0, aim: Math.PI / 2, aimHold: 0, moving: false, hurt: 0, flash: 0, walk: 0 },
       hp: stats.hp, maxHp: stats.hp,
       cam: { x: WORLD / 2, y: WORLD / 2 },
       zombies: [], bullets: [], gems: [], pickups: [], crates: [], obstacles: [], barrels: [], fireballs: [], grenades: [], fx: [], texts: [],
@@ -287,8 +287,9 @@ const Arena = (() => {
       r.bullets.push({ x: p.x + Math.cos(a) * 24, y: p.y - 40 + Math.sin(a) * 24, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.7,
         m: r.wpn.pellets ? 0.55 : 1, pierce: (r.wpn.pierce || 0) + (r.skills.pierce || 0), splash: r.wpn.splash ? 75 : 0, hits: new Set() });
     }
-    p.face = tx < p.x ? -1 : 1;
-    p.flash = 0.06;
+    p.aim = base;
+    p.aimHold = 0.7;
+    p.flash = 0.07;
     Sound.play(r.wpn.splash ? 'throw' : 'shoot');
   }
 
@@ -422,7 +423,15 @@ const Arena = (() => {
     p.vx = mx * speed; p.vy = my * speed;
     p.x = clamp(p.x + p.vx * dt, 40, WORLD - 40);
     p.y = clamp(p.y + p.vy * dt, 60, WORLD - 30);
-    if (ml > 0.1) { p.walk += dt * 9; if (Math.abs(mx) > 0.2) p.face = mx < 0 ? -1 : 1; p.up = my < -0.3; }
+    p.moving = ml > 0.1;
+    p.walk += dt * (p.moving ? 11 : 3);
+    // Face the last shot for a moment, otherwise turn toward where we walk.
+    p.aimHold -= dt;
+    if (p.aimHold <= 0 && p.moving) {
+      let d = Math.atan2(my, mx) - p.aim;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      p.aim += d * Math.min(1, dt * 10);
+    }
     for (const o of r.obstacles) pushOut(p, o.x, o.y, o.r + 18);
     for (const b of r.barrels) pushOut(p, b.x, b.y, b.r + 18);
     r.cam.x += (p.x - r.cam.x) * Math.min(1, dt * 8);
@@ -837,20 +846,23 @@ const Arena = (() => {
 
   function drawPlayer() {
     const r = run, p = r.p;
-    const X = sx(p.x), Y = sy(p.y), h = 82 * S;
-    if (p.hurt > 0 && Math.floor(p.hurt * 25) % 2) return;
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.ellipse(X, Y, 22 * S, 7 * S, 0, 0, Math.PI * 2); ctx.fill();
-    // Blue ring marks the player
-    ctx.strokeStyle = 'rgba(80,190,255,.8)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(X, Y, 30 * S, 11 * S, 0, 0, Math.PI * 2); ctx.stroke();
-    const bob = Math.abs(Math.sin(p.walk)) * 3 * S;
+    const X = sx(p.x), Y = sy(p.y), h = 96 * S;
+    // Ground marker: soft glow ring with a chevron pointing where we aim
+    const fx = Math.cos(p.aim), fy = Math.sin(p.aim);
+    const ring = ctx.createRadialGradient(X, Y, 4, X, Y, 34 * S);
+    ring.addColorStop(0, 'rgba(0,0,0,.28)'); ring.addColorStop(0.7, 'rgba(0,0,0,.12)'); ring.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ring;
+    ctx.beginPath(); ctx.ellipse(X, Y, 34 * S, 12 * S, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(90,200,255,.9)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(X, Y, 32 * S, 11.5 * S, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.save();
-    ctx.translate(X, Y - bob);
-    if (p.face < 0) ctx.scale(-1, 1);
-    if (p.up) drawSoldierBack(ctx, 0, 0, h, p.walk / 6, p.flash, r.weapon);
-    else drawTrooper(ctx, 0, 0, h * 0.95, p.walk / 14, { back: false, helmet: '#5d8f46', phase: 0 });
+    ctx.translate(X + fx * 42 * S, Y + fy * 15 * S);
+    ctx.scale(1, 0.38); ctx.rotate(p.aim);
+    ctx.fillStyle = 'rgba(90,200,255,.95)'; ctx.strokeStyle = 'rgba(20,19,43,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(12 * S, 0); ctx.lineTo(-6 * S, -11 * S); ctx.lineTo(-2 * S, 0); ctx.lineTo(-6 * S, 11 * S); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+    if (p.hurt > 0 && Math.floor(p.hurt * 25) % 2) return;
+    drawArenaHero(ctx, X, Y, h, { aim: p.aim, walk: p.walk, moving: p.moving, flash: p.flash, weapon: r.weapon });
     if (r.shield > 0) {
       ctx.save();
       ctx.globalAlpha = 0.3 + 0.15 * Math.sin(r.t * 10);
@@ -860,7 +872,7 @@ const Arena = (() => {
     }
     if (r.rage > 0) {
       ctx.strokeStyle = 'rgba(255,90,40,.7)'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.ellipse(X, Y, 36 * S, 13 * S, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(X, Y, 38 * S, 14 * S, 0, 0, Math.PI * 2); ctx.stroke();
     }
   }
 

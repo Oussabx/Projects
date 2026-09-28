@@ -181,6 +181,121 @@ function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0, weapon = 'rif
   ctx.restore();
 }
 
+// Chibi hero for the top-down arena: turns toward where it aims, holds its weapon in both hands.
+// aim: radians in screen space (0 = right, -PI/2 = up). walk: animation phase, moving: legs step.
+function drawArenaHero(ctx, cx, footY, height, opts = {}) {
+  const { aim = Math.PI / 2, walk = 0, moving = false, flash = 0, weapon = 'rifle' } = opts;
+  const u = height / 100;
+  const fx = Math.cos(aim), fy = Math.sin(aim);
+  const back = fy < -0.3;                        // aiming away from the camera
+  const side = fx >= 0 ? 1 : -1;
+  const lw = 2.8;
+  const step = moving ? Math.sin(walk) : 0;
+  const bob = moving ? Math.abs(Math.cos(walk)) * 2.2 : Math.sin(walk * 0.3) * 0.6;
+
+  ctx.save();
+  ctx.translate(cx, footY);
+  ctx.scale(u, u);
+
+  // Boots and legs, stepping
+  for (const s of [-1, 1]) {
+    const lift = Math.max(0, step * s) * 7, fwd = step * s * 2.5;
+    rr(ctx, s * 9 - 7 + fwd * 0.3, -30 - lift, 14, 20, 5); blob(ctx, CAMO_DARK, lw);
+    rr(ctx, s * 9 - 8.5 + fwd * 0.3, -13 - lift, 17, 11, 5); blob(ctx, '#3b2a1e', lw);
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(s * 9 - 5 + fwd * 0.3, -11 - lift, 8, 2.5);
+  }
+  ctx.translate(0, -bob);
+
+  // Weapon geometry: gripped at chest height, foreshortened when pointing toward or away from the camera.
+  const big = weapon === 'minigun' || weapon === 'rocket';
+  const len = big ? 74 : weapon === 'sniper' ? 70 : weapon === 'smg' ? 50 : 62;
+  const gx = side * (back ? 11 : 6), gy = back ? -52 : -44;
+  const shorten = 0.5 + 0.5 * Math.abs(fx);
+  const drawGun = () => {
+    ctx.save();
+    ctx.translate(gx, gy);
+    ctx.rotate(aim);
+    ctx.scale(shorten, fx < 0 ? -1 : 1);
+    drawWeaponSide(ctx, weapon, len * 0.2, 0, len);
+    if (flash > 0) {
+      const tip = len * 0.72;
+      const g = ctx.createRadialGradient(tip, 0, 0, tip, 0, 16);
+      g.addColorStop(0, 'rgba(255,255,230,1)'); g.addColorStop(0.45, 'rgba(255,200,60,.95)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(tip, 0, 16, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  };
+  // Hands on the grip and the fore-grip, arms from the shoulders
+  const hand1 = [gx + fx * 4 * shorten, gy + fy * 4];
+  const hand2 = [gx + fx * 20 * shorten, gy + fy * 20 * 0.8];
+  const drawArms = () => {
+    limb(ctx, -side * 15, -54, hand1[0], hand1[1], 9, CAMO, lw);
+    limb(ctx, side * 15, -54, hand2[0], hand2[1], 9, CAMO, lw);
+    for (const [hx, hy] of [hand1, hand2]) { ctx.beginPath(); ctx.arc(hx, hy, 5.5, 0, Math.PI * 2); blob(ctx, SKIN, lw); }
+  };
+
+  if (back) { drawGun(); drawArms(); }
+
+  // Torso: camo jacket, vest and belt
+  rr(ctx, -19, -62, 38, 34, 11); blob(ctx, CAMO, lw);
+  ctx.save(); rr(ctx, -19, -62, 38, 34, 11); ctx.clip(); camoSpots(ctx, -19, -62, 38, 34); ctx.restore();
+  rr(ctx, -19, -62, 38, 34, 11); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.stroke();
+  if (back) {
+    // Backpack with bedroll
+    rr(ctx, -14, -60, 28, 27, 7); blob(ctx, '#7a5a34', lw);
+    rr(ctx, -12, -48, 24, 11, 4); blob(ctx, '#6a4c2a', 2);
+    rr(ctx, -15, -66, 30, 8, 4); blob(ctx, '#4a6a8a', 2);
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(-10, -57, 12, 3);
+  } else {
+    ctx.fillStyle = '#2c3a22';
+    ctx.fillRect(-12, -62, 5, 31); ctx.fillRect(7, -62, 5, 31);
+    rr(ctx, -9, -50, 8, 9, 2); blob(ctx, '#4a5a2a', 1.8);
+    rr(ctx, 1, -50, 8, 9, 2); blob(ctx, '#4a5a2a', 1.8);
+  }
+  rr(ctx, -19, -34, 38, 6, 2); blob(ctx, '#2c3a22', 0);
+  rr(ctx, -4, -35, 8, 8, 2); blob(ctx, '#c9a44a', 1.5);
+
+  // Head: big chibi head under a helmet
+  const hx = back ? 0 : fx * 2.5;
+  if (back) {
+    // Back of the head: ears and short hair under the helmet
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 20, -76, 4.5, 6, 0, 0, Math.PI * 2); blob(ctx, SKIN, 2.2); }
+    ctx.beginPath(); ctx.arc(0, -78, 20, 0, Math.PI * 2); blob(ctx, '#5a3d27', lw);
+    ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1.6;
+    for (const x of [-9, -3, 3, 9]) { ctx.beginPath(); ctx.moveTo(x, -72); ctx.lineTo(x * 0.8, -62); ctx.stroke(); }
+    rr(ctx, -6, -63, 12, 6, 3); blob(ctx, SKIN, 2);
+  } else {
+    ctx.beginPath(); ctx.arc(hx, -78, 21, 0, Math.PI * 2); blob(ctx, SKIN, lw);
+  }
+  if (!back) {
+    const ex = fx * 3.5, ey = fy * 1.5;
+    ctx.fillStyle = 'rgba(255,120,120,.45)';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(hx + s * 12, -70, 4.5, 2.8, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = INK;
+      ctx.beginPath(); ctx.ellipse(hx + s * 7.5 + ex, -76 + ey, 3.6, 4.8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(hx + s * 7.5 + ex - 1.2, -78 + ey, 1.5, 0, Math.PI * 2); ctx.fill();
+      // Determined brows
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(hx + s * 3.5 + ex, -82 + ey); ctx.lineTo(hx + s * 11.5 + ex, -84.5 + ey); ctx.stroke();
+    }
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(hx - 3 + ex, -67); ctx.lineTo(hx + 3 + ex, -67.5); ctx.stroke();
+  }
+  // Helmet: dome with a rim and a shine
+  ctx.beginPath(); ctx.ellipse(hx, back ? -80 : -85, 27, back ? 25 : 22, 0, Math.PI, 0); ctx.closePath(); blob(ctx, HELMET, lw);
+  if (back) { ctx.beginPath(); ctx.ellipse(hx, -80, 27, 13, 0, 0, Math.PI); ctx.closePath(); blob(ctx, HELMET, lw); }
+  ctx.beginPath(); ctx.ellipse(hx, back ? -80 : -85, 29, 5.5, 0, 0, Math.PI * 2); blob(ctx, HELMET_LIGHT, lw);
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.beginPath(); ctx.ellipse(hx - 10, -98, 7, 3.5, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(20,40,10,.35)';
+  ctx.beginPath(); ctx.ellipse(hx + 8, -94, 4, 2.5, 0.3, 0, Math.PI * 2); ctx.ellipse(hx - 2, -88, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+
+  if (!back) { drawGun(); drawArms(); }
+  ctx.restore();
+}
+
 // ---------- Zombies ----------
 
 // Mix a hex color toward black (amt < 0) or white (amt > 0).
