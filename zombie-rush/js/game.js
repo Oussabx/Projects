@@ -119,8 +119,6 @@ const Game = (() => {
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
-      // Support calls start 60% charged.
-      abCd: Object.fromEntries(ABILITIES.map(a => [a.id, a.cd * 0.6])),
       strikes: [], jet: null, tank: null, heli: null, frozen: 0,
     };
     hud.level.textContent = `${chIdx + 1}-${lvlIdx + 1} · ${cfg.name}`;
@@ -578,13 +576,13 @@ const Game = (() => {
   }
 
   function abilityReady(id) {
-    return !!run && run.state === 'playing' && run.abCd[id] <= 0 && !(id === 'tank' && run.tank) && !(id === 'heli' && run.heli);
+    // No cooldowns: each call only costs a rewarded ad.
+    return !!run && run.state === 'playing' && ABILITIES.some(a => a.id === id);
   }
 
   function useAbility(id) {
     const r = run;
-    if (!r || r.state !== 'playing' || !(id in r.abCd)) return false;
-    r.abCd[id] = ABILITIES.find(a => a.id === id).cd;
+    if (!abilityReady(id)) return false;
     const P = supportPower();
     if (id === 'air') {
       r.jet = { t: 0, dur: 1.5 };
@@ -606,11 +604,14 @@ const Game = (() => {
       Sound.play('warn');
       showBanner('AIRSTRIKE INCOMING', 1.2, 'good');
     } else if (id === 'tank') {
-      r.tank = { x: r.cx, z: -2.5, t: 0, dur: 8, shotCd: 0.9, recoil: 0, m: P * 0.9 };
+      // Calling again while it's still here refreshes its time.
+      if (r.tank && r.tank.t < r.tank.dur) { r.tank.t = 0; r.tank.m = Math.max(r.tank.m, P * 0.9); }
+      else r.tank = { x: r.cx, z: -2.5, t: 0, dur: 8, shotCd: 0.9, recoil: 0, m: P * 0.9 };
       Sound.play('thud');
       showBanner('TANK SUPPORT', 1.2, 'good');
     } else if (id === 'heli') {
-      r.heli = { x: 0, z: -3, t: 0, dur: 8, cd: 0, m: P * 0.8 / 14 };
+      if (r.heli && r.heli.t < r.heli.dur) { r.heli.t = 0; r.heli.m = Math.max(r.heli.m, P * 0.8 / 14); }
+      else r.heli = { x: 0, z: -3, t: 0, dur: 8, cd: 0, m: P * 0.8 / 14 };
       showBanner('HELI SUPPORT', 1.2, 'good');
     } else if (id === 'freeze') {
       r.frozen = 4;
@@ -652,7 +653,6 @@ const Game = (() => {
 
   function updateSupport(dt, move) {
     const r = run;
-    for (const a of ABILITIES) r.abCd[a.id] = Math.max(0, r.abCd[a.id] - dt);
     r.frozen = Math.max(0, r.frozen - dt);
 
     if (r.jet) { r.jet.t += dt; if (r.jet.t > r.jet.dur) r.jet = null; }
@@ -1679,27 +1679,16 @@ const Game = (() => {
     const html = chips.join('');
     if (html !== lastBuffs) { hud.buffs.innerHTML = html; lastBuffs = html; }
 
-    // Support buttons: cooldown sweep, "READY!" pop, and a duration bar while a call is active.
+    // Support buttons: glow when usable, duration bar while a call is active.
     for (const a of ABILITIES) {
       const el = abBtns[a.id] || (abBtns[a.id] = document.querySelector(`.ab-btn[data-ab="${a.id}"]`));
       if (!el) continue;
-      const left = r.abCd[a.id], ready = abilityReady(a.id);
       const active = a.id === 'tank' ? r.tank && r.tank.t < r.tank.dur && 1 - r.tank.t / r.tank.dur
         : a.id === 'heli' ? r.heli && r.heli.t < r.heli.dur && 1 - r.heli.t / r.heli.dur
         : a.id === 'freeze' ? r.frozen > 0 && r.frozen / 4
         : r.strikes.length || r.jet ? 1 : 0;
-      const busy = !!active || (a.id === 'tank' && !!r.tank) || (a.id === 'heli' && !!r.heli);
-      const p = busy ? 0 : left / a.cd;
-      const txt = busy || left <= 0 ? '' : String(Math.ceil(left));
-      if (el._p !== p.toFixed(3)) { el._p = p.toFixed(3); el.style.setProperty('--p', el._p); }
       if (active) el.style.setProperty('--d', active.toFixed(3));
-      if (el._txt !== txt) { el._txt = txt; el.querySelector('.ab-cd').textContent = txt; }
-      if (ready && el._ready === false) {
-        el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-        clearTimeout(el._popT); el._popT = setTimeout(() => el.classList.remove('pop'), 900);
-      }
-      el._ready = ready;
-      el.classList.toggle('ready', ready);
+      el.classList.toggle('ready', abilityReady(a.id) && !active);
       el.classList.toggle('active', !!active);
     }
   }

@@ -509,7 +509,12 @@ const UI = (() => {
       <div class="ribbon pink"><span class="tx">Shop</span></div>
       <div class="segs">${tabs}</div>
       ${freeCard}
-      <div class="shop-grid">${cards}</div>
+      ${shopTab === 'chests' ? `<div class="crate-head tx">${icon('ad', '', 22)}Gear Crates <small>watch a video · unlimited</small></div>
+      <div class="crate-grid">${GEAR_CRATES.map(c => `<button class="panel crate-card" data-crate="${c.id}">
+        <span class="crate-art">${icon('chest', c.color, 56)}<span class="crate-slot">${icon(c.slot, SLOT_COLORS[c.slot], 28)}</span></span>
+        <span class="crate-name tx">${c.name.replace(' Crate', '')}</span>
+        <span class="crate-btn tx">▶ WATCH</span></button>`).join('')}</div>` : ''}
+      <div class="shop-grid ${shopTab === 'chests' ? 'compact' : ''}">${cards}</div>
       <p class="note">${notes[shopTab]}</p>`;
 
     const s = $('#screen-shop');
@@ -521,6 +526,11 @@ const UI = (() => {
       chestOpening(CHESTS[0]);
     };
     s.querySelectorAll('[data-shoptab]').forEach(b => b.addEventListener('click', () => { shopTab = b.dataset.shoptab; render('shop'); }));
+    s.querySelectorAll('[data-crate]').forEach(b => b.addEventListener('click', () => {
+      const c = GEAR_CRATES.find(x => x.id === b.dataset.crate);
+      Ads.showRewarded({ title: c.name, desc: `Watch to open a free ${c.name}.`, claim: 'Open crate!', draw: (ctx, w, h, t) => drawCrateAd(ctx, w, h, c, t) },
+        rewarded => { if (rewarded) chestOpening(c); else toast('Watch the full video to open the crate'); });
+    }));
     s.querySelectorAll('[data-chest]').forEach(b => b.addEventListener('click', () => {
       const c = CHESTS.find(x => x.id === b.dataset.chest);
       if (save[c.currency] < c.price) { toast(`Not enough ${c.currency}`); return; }
@@ -538,6 +548,34 @@ const UI = (() => {
       const p = GEM_PACKS[+b.dataset.gems];
       save.gems += p.gems; persist(); Sound.play('coin'); render('shop'); toast(`+${fmt(p.gems)} gems`);
     }));
+  }
+
+  const SLOT_COLORS = { helmet: '#5d8f46', rifle: '#8a93a6', gloves: '#c98b4a', scope: '#3a4a5a' };
+
+  // Demo video for gear crates: the crate bounces under light rays with its gear piece floating above.
+  const crateImgs = {};
+  function svgImg(markup) {
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
+    return img;
+  }
+  function drawCrateAd(c, w, h, crate, t) {
+    const imgs = crateImgs[crate.id] || (crateImgs[crate.id] = { chest: svgImg(icon('chest', crate.color, 200)), gear: svgImg(icon(crate.slot, SLOT_COLORS[crate.slot], 120)) });
+    const bg = c.createRadialGradient(w / 2, h * 0.55, 10, w / 2, h * 0.55, w * 0.7);
+    bg.addColorStop(0, '#5a6cff'); bg.addColorStop(1, '#1b1f5a');
+    c.fillStyle = bg; c.fillRect(0, 0, w, h);
+    c.save(); c.translate(w / 2, h * 0.55); c.rotate(t * 0.4);
+    c.fillStyle = 'rgba(255,255,255,.08)';
+    for (let k = 0; k < 12; k++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(w, -60); c.lineTo(w, 60); c.fill(); }
+    c.restore();
+    const hop = Math.abs(Math.sin(t * 3)) * 22;
+    if (imgs.chest.complete) c.drawImage(imgs.chest, w / 2 - 100, h * 0.5 - 60 - hop, 200, 200);
+    if (imgs.gear.complete) c.drawImage(imgs.gear, w / 2 - 60, h * 0.12 + Math.sin(t * 2) * 10, 120, 120);
+    for (let k = 0; k < 8; k++) {
+      const a = t * 1.5 + k * 0.8, rr = 150 + Math.sin(t * 3 + k) * 20;
+      c.fillStyle = RARITIES[k % 5].color;
+      c.beginPath(); c.arc(w / 2 + Math.cos(a) * rr, h * 0.55 + Math.sin(a) * rr * 0.6, 6, 0, Math.PI * 2); c.fill();
+    }
   }
 
   function chestOpening(chest, after) {
@@ -776,8 +814,7 @@ const UI = (() => {
 
   function buildAbilities() {
     const btn = a => `<button class="ab-btn" data-ab="${a.id}" style="--c:${a.color};--c-hi:${shadeHex(a.color, 0.45)};--c-lo:${shadeHex(a.color, -0.45)}" aria-label="${a.name}, watch an ad to use">
-      <span class="ab-tile"><img class="ab-art" src="${abilityArt(a.id)}" alt=""><span class="ab-cool"></span><span class="ab-sheen"></span>
-        <span class="ab-cd tx"></span><span class="ab-dur"><i></i></span></span>
+      <span class="ab-tile"><img class="ab-art" src="${abilityArt(a.id)}" alt=""><span class="ab-sheen"></span><span class="ab-dur"><i></i></span></span>
       <span class="ab-ad">${icon('ad', '', 18)}</span>
       <span class="ab-foot tx"><span class="off">${a.short || a.name}</span><span class="on">▶ ${a.short || a.name}</span></span></button>`;
     $('#ab-left').innerHTML = ABILITIES.slice(0, 2).map(btn).join('');
@@ -798,7 +835,7 @@ const UI = (() => {
     Sound.play('click');
     Game.pause();
     adOpen = true;
-    Ads.showRewarded(a, rewarded => {
+    Ads.showRewarded({ title: a.name, desc: a.desc, claim: `Call ${a.name}!`, draw: (c, w, h, t) => drawAdScene(c, w, h, a.id, t) }, rewarded => {
       adOpen = false;
       Game.resume();
       if (rewarded) Game.useAbility(id);
@@ -810,10 +847,11 @@ const UI = (() => {
   // plugs in here: show its rewarded ad and call done(true) only when it reports the reward was earned.
   const AD_SECONDS = 5;
   const Ads = {
-    showRewarded(a, done) {
+    // opts: { title, desc, claim, draw(ctx, w, h, t) }; done(rewarded) runs when the ad closes.
+    showRewarded(opts, done) {
       const view = $('#ad-view'), claim = $('#ad-claim'), claimText = $('#ad-claim-text'), timer = $('#ad-timer'), fill = $('#ad-bar-fill');
       $('#ad-body').innerHTML = `<canvas class="ad-canvas" id="ad-canvas" width="600" height="420"></canvas>
-        <div class="ad-title tx">${a.name.toUpperCase()}</div><div class="ad-desc">${a.desc}</div>
+        <div class="ad-title tx">${opts.title.toUpperCase()}</div><div class="ad-desc">${opts.desc}</div>
         <div class="ad-note">Demo ad. Real video ads show here once an ad network is connected.</div>`;
       view.hidden = false;
       claim.disabled = true;
@@ -830,8 +868,8 @@ const UI = (() => {
           claim.classList.add('pulse');
           Sound.play('coin');
         }
-        claimText.textContent = earned ? `Call ${a.name}!` : `Wait ${Math.ceil(left)}…`;
-        drawAdScene(c, cv.width, cv.height, a.id, t);
+        claimText.textContent = earned ? opts.claim : `Wait ${Math.ceil(left)}…`;
+        opts.draw(c, cv.width, cv.height, t);
         raf = requestAnimationFrame(frame);
       };
       raf = requestAnimationFrame(frame);

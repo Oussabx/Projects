@@ -133,7 +133,7 @@ function openChest(chest) {
     acc += chest.odds[i];
     if (r < acc) { rarity = i; break; }
   }
-  const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)].id;
+  const slot = chest.slot || SLOTS[Math.floor(Math.random() * SLOTS.length)].id;
   const item = addItem(slot, rarity);
   persist();
   return item;

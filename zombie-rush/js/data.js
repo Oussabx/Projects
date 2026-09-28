@@ -54,6 +54,11 @@ const CHESTS = [
   { id: 'gold',   name: 'Golden Chest', price: 350, currency: 'gems',  odds: [0, 0, 60, 33, 7],   color: '#ffc632' },
 ];
 
+// One crate per gear slot, opened by watching a rewarded video (no cooldown).
+const GEAR_CRATES = SLOTS.map(sl => ({
+  id: 'crate-' + sl.id, slot: sl.id, name: `${sl.name} Crate`, odds: [60, 28, 10, 2, 0], color: '#6f8fb8', ad: true,
+}));
+
 const COIN_PACKS = [
   { coins: 1000, gems: 80 },
   { coins: 3000, gems: 200 },
@@ -277,10 +282,10 @@ const BOT_NAMES = [
   'Iceman', 'Blaze',
 ];
 
-// In-level support calls. Each one is unlocked by watching a rewarded ad, then recharges.
+// In-level support calls. Each use costs one rewarded ad; there is no cooldown.
 const ABILITIES = [
-  { id: 'air', name: 'Airstrike', icon: 'jet', cd: 18, color: '#ff8a1f', desc: 'A jet drops 4 bombs on the horde.' },
-  { id: 'tank', name: 'Tank', icon: 'tank', cd: 28, color: '#7fb04e', desc: 'A tank rolls in, shelling and crushing zombies.' },
-  { id: 'heli', name: 'Helicopter', short: 'Heli', icon: 'heli', cd: 25, color: '#4f9cf0', desc: 'A gunship rains bullets for 8 seconds.' },
-  { id: 'freeze', name: 'Freeze', icon: 'freeze', cd: 30, color: '#8fe0ff', desc: 'Everything freezes solid for 4 seconds.' },
+  { id: 'air', name: 'Airstrike', icon: 'jet', color: '#ff8a1f', desc: 'A jet drops 4 bombs on the horde.' },
+  { id: 'tank', name: 'Tank', icon: 'tank', color: '#7fb04e', desc: 'A tank rolls in, shelling and crushing zombies.' },
+  { id: 'heli', name: 'Helicopter', short: 'Heli', icon: 'heli', color: '#4f9cf0', desc: 'A gunship rains bullets for 8 seconds.' },
+  { id: 'freeze', name: 'Freeze', icon: 'freeze', color: '#8fe0ff', desc: 'Everything freezes solid for 4 seconds.' },
 ];

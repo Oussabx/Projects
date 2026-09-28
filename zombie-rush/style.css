@@ -958,7 +958,7 @@ input[type=range]::-moz-range-thumb {
 
 /* ---------- Rewarded ad ---------- */
 .ad-view {
-  position: absolute; inset: 0; z-index: 30; background: #0b0a1f;
+  position: absolute; inset: 0; z-index: 60; background: #0b0a1f;
   display: flex; flex-direction: column; padding: calc(10px + var(--safe-t)) 14px calc(16px + var(--safe-b));
   animation: fade .2s;
 }
@@ -980,3 +980,48 @@ input[type=range]::-moz-range-thumb {
 .ad-bar-fill { height: 100%; width: 0; background: linear-gradient(90deg, #ffc933, #4fd645); }
 .ad-claim { font-size: 1.3rem; padding: 12px; }
 .ad-claim.pulse { animation: ab-glow 1s ease-in-out infinite; }
+
+/* ---------- Gear crates (watch a video) ---------- */
+.crate-head { display: flex; align-items: center; gap: 6px; font-size: 1.05rem; margin: 2px 2px 6px; }
+.crate-head svg { width: 22px; height: 22px; }
+.crate-head small { font-family: var(--font); font-size: .72rem; color: #cfd4ff; -webkit-text-stroke: 0; text-shadow: none; margin-left: auto; }
+.crate-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+.crate-card {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 7px; cursor: pointer;
+  background: linear-gradient(#4f6fd8, #2f44a8); border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.3), inset 0 -4px 0 rgba(0,0,0,.25), 0 3px 0 var(--ink);
+  transition: transform .1s;
+}
+.crate-card:active { transform: translateY(2px) scale(.96); }
+.crate-art { position: relative; width: 56px; height: 52px; display: grid; place-items: center; }
+.crate-art > svg { width: 52px; height: 52px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+.crate-slot {
+  position: absolute; right: -6px; top: -6px; width: 32px; height: 32px; border-radius: 50%;
+  background: #fff; border: 2.5px solid var(--ink); display: grid; place-items: center; box-shadow: 0 2px 0 var(--ink);
+}
+.crate-slot svg { width: 22px; height: 22px; }
+.crate-name { font-size: .78rem; }
+.crate-btn {
+  font-size: .72rem; padding: 2px 8px 3px; border-radius: 8px; border: 2px solid var(--ink);
+  background: linear-gradient(#5fe04f, #2fa82a); box-shadow: 0 2px 0 var(--ink); white-space: nowrap;
+}
+.crate-card:hover .crate-btn, .crate-card:focus-visible .crate-btn { filter: brightness(1.1); }
+/* Chests tab also shows the gear crate row: keep everything on one screen. */
+.shop-grid.compact .offer { min-height: clamp(150px, 22vh, 250px); gap: 5px; padding: 10px 6px 8px; }
+.shop-grid.compact .offer .art { height: clamp(52px, 8vh, 84px); }
+.shop-grid.compact .offer .art svg { width: clamp(48px, 7vh, 76px); height: clamp(48px, 7vh, 76px); }
+@media (max-width: 380px) { .crate-btn { font-size: .64rem; padding: 2px 5px 3px; } }
+@media (max-height: 700px) {
+  .crate-name { display: none; }
+  .free-card { grid-template-columns: 44px 1fr auto; padding: 4px 10px; }
+  .free-card .free-art svg { width: 44px; height: 44px; }
+  .free-card .btn { padding-top: 4px; padding-bottom: 8px; }
+  #screen-shop .note { display: none; }
+  .shop-grid.compact .offer { gap: 3px; }
+  .shop-grid.compact .offer .title { min-height: 0; font-size: .88rem; }
+  .shop-grid.compact .offer .odds { font-size: .62rem; }
+  .crate-card { padding: 5px 3px 5px; gap: 1px; }
+  .crate-art { height: 42px; }
+  .crate-art > svg { width: 42px; height: 42px; }
+  .crate-head { margin-bottom: 4px; }
+}
