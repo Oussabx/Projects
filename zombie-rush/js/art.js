@@ -990,7 +990,134 @@ const ICONS = {
   minigun: c => `<rect x="6" y="18" width="26" height="26" rx="6" fill="${c}" stroke="${INK}" stroke-width="4"/><rect x="30" y="20" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="30" y="28" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="30" y="36" width="28" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/><rect x="14" y="42" width="8" height="14" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/>`,
   rocket: c => `<rect x="4" y="24" width="44" height="16" rx="7" fill="${c}" stroke="${INK}" stroke-width="4"/><path d="M46 22l14 10-14 10z" fill="#ff4d5e" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><rect x="16" y="38" width="8" height="14" rx="2" fill="${c}" stroke="${INK}" stroke-width="4"/>`,
   pause: () => `<rect x="14" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/><rect x="38" y="10" width="12" height="44" rx="3" fill="#fff" stroke="${INK}" stroke-width="4"/>`,
+  jet: c => `<path d="M32 4c4 0 6 6 6 14v8l20 14v6l-20-6v10l7 6v4l-13-3-13 3v-4l7-6V40L6 46v-6l20-14v-8c0-8 2-14 6-14z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><ellipse cx="32" cy="16" rx="3" ry="6" fill="#bfe8ff"/>`,
+  tank: c => `<rect x="6" y="36" width="52" height="16" rx="8" fill="#555c66" stroke="${INK}" stroke-width="4"/><circle cx="16" cy="44" r="3" fill="#9aa3ad"/><circle cx="32" cy="44" r="3" fill="#9aa3ad"/><circle cx="48" cy="44" r="3" fill="#9aa3ad"/><path d="M10 36l4-10h36l4 10z" fill="${c}" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/><rect x="20" y="16" width="22" height="12" rx="4" fill="${c}" stroke="${INK}" stroke-width="4"/><rect x="40" y="18" width="20" height="6" rx="2" fill="${c}" stroke="${INK}" stroke-width="3"/>`,
+  heli: c => `<rect x="4" y="10" width="56" height="5" rx="2" fill="${INK}"/><rect x="30" y="12" width="4" height="10" fill="${INK}"/><path d="M12 30c0-6 6-10 14-10h8c8 0 12 6 12 12s-6 12-14 12H22c-6 0-10-6-10-14z" fill="${c}" stroke="${INK}" stroke-width="4"/><path d="M46 30h12l2-6" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><path d="M18 30c0-4 3-6 8-6v10h-8z" fill="#bfe8ff"/><path d="M20 44l-4 8M40 44l4 8M12 52h38" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`,
+  freeze: c => `<g stroke="${INK}" stroke-width="10" stroke-linecap="round"><path d="M32 6v52M9 19l46 26M9 45l46-26"/></g><g stroke="${c}" stroke-width="5" stroke-linecap="round"><path d="M32 6v52M9 19l46 26M9 45l46-26M24 10l8 7 8-7M24 54l8-7 8 7"/></g><circle cx="32" cy="32" r="7" fill="#fff" stroke="${INK}" stroke-width="3"/>`,
+  ad: () => `<rect x="4" y="12" width="56" height="40" rx="8" fill="#ffc933" stroke="${INK}" stroke-width="4"/><path d="M26 22v20l16-10z" fill="#fff" stroke="${INK}" stroke-width="3.5" stroke-linejoin="round"/>`,
 };
+
+// ---------- Support vehicles (top-down-ish, drawn centered at x,y with size s) ----------
+
+function drawJet(ctx, x, y, s, t) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, s * 0.05);
+  ctx.strokeStyle = INK;
+  // Afterburner
+  ctx.fillStyle = `rgba(255,170,60,${0.6 + 0.3 * Math.sin(t * 50)})`;
+  ctx.beginPath(); ctx.ellipse(0, s * 0.62, s * 0.08, s * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7b8794';
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.55);
+  ctx.quadraticCurveTo(s * 0.1, -s * 0.4, s * 0.1, -s * 0.1);
+  ctx.lineTo(s * 0.55, s * 0.15); ctx.lineTo(s * 0.55, s * 0.27); ctx.lineTo(s * 0.1, s * 0.18);
+  ctx.lineTo(s * 0.1, s * 0.35); ctx.lineTo(s * 0.25, s * 0.48); ctx.lineTo(s * 0.25, s * 0.55); ctx.lineTo(0, s * 0.5);
+  ctx.lineTo(-s * 0.25, s * 0.55); ctx.lineTo(-s * 0.25, s * 0.48); ctx.lineTo(-s * 0.1, s * 0.35);
+  ctx.lineTo(-s * 0.1, s * 0.18); ctx.lineTo(-s * 0.55, s * 0.27); ctx.lineTo(-s * 0.55, s * 0.15); ctx.lineTo(-s * 0.1, -s * 0.1);
+  ctx.quadraticCurveTo(-s * 0.1, -s * 0.4, 0, -s * 0.55);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5b6672';
+  ctx.fillRect(-s * 0.5, s * 0.17, s * 0.38, s * 0.05); ctx.fillRect(s * 0.12, s * 0.17, s * 0.38, s * 0.05);
+  ctx.fillStyle = '#8fd2ff';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.25, s * 0.05, s * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+// Tank seen from behind: tracks, hull, turret and a barrel pointing up the road.
+function drawTank(ctx, x, footY, s, t, recoil = 0) {
+  ctx.save();
+  ctx.translate(x, footY);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, s * 0.04);
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = 'rgba(0,0,0,.28)';
+  ctx.beginPath(); ctx.ellipse(0, 0, s * 0.62, s * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+  const bob = Math.sin(t * 18) * s * 0.01;
+  // Tracks
+  for (const sx of [-1, 1]) {
+    ctx.fillStyle = '#3b4048';
+    rr(ctx, sx * s * 0.38 - s * 0.14, -s * 0.34, s * 0.28, s * 0.36, s * 0.08); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#6c737d'; ctx.lineWidth = Math.max(1, s * 0.02);
+    for (let k = 0; k < 4; k++) {
+      const yy = -s * 0.3 + ((k * 0.08 + t * 0.6) % 0.32) * s;
+      ctx.beginPath(); ctx.moveTo(sx * s * 0.38 - s * 0.12, yy); ctx.lineTo(sx * s * 0.38 + s * 0.12, yy); ctx.stroke();
+    }
+    ctx.strokeStyle = INK; ctx.lineWidth = Math.max(2, s * 0.04);
+  }
+  // Hull
+  ctx.fillStyle = '#5f8a3c';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.4, -s * 0.12 + bob); ctx.lineTo(-s * 0.34, -s * 0.44 + bob); ctx.lineTo(s * 0.34, -s * 0.44 + bob); ctx.lineTo(s * 0.4, -s * 0.12 + bob);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#4a6d2e';
+  ctx.fillRect(-s * 0.36, -s * 0.2 + bob, s * 0.72, s * 0.06);
+  // Barrel (foreshortened, pointing away)
+  ctx.fillStyle = '#4a6d2e';
+  rr(ctx, -s * 0.05, -s * (0.88 - recoil * 0.08) + bob, s * 0.1, s * 0.34, s * 0.03); ctx.fill(); ctx.stroke();
+  // Turret
+  ctx.fillStyle = '#6f9b48';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.5 + bob, s * 0.24, s * 0.15, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#4a6d2e';
+  ctx.beginPath(); ctx.arc(-s * 0.08, -s * 0.56 + bob, s * 0.06, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Star
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + k * Math.PI / 5, rad = (k % 2 ? 0.025 : 0.06) * s;
+    ctx.lineTo(Math.cos(a) * rad, -s * 0.3 + bob + Math.sin(a) * rad);
+  }
+  ctx.closePath(); ctx.fill();
+  if (recoil > 0.5) {
+    ctx.fillStyle = 'rgba(255,200,80,.9)';
+    ctx.beginPath(); ctx.arc(0, -s * 0.92 + bob, s * 0.1, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Helicopter seen from behind and above, rotor spinning.
+function drawHeli(ctx, x, y, s, t, firing) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, s * 0.04);
+  ctx.strokeStyle = INK;
+  // Tail boom
+  ctx.fillStyle = '#3d5a80';
+  rr(ctx, -s * 0.05, 0, s * 0.1, s * 0.5, s * 0.04); ctx.fill(); ctx.stroke();
+  ctx.fillRect(-s * 0.16, s * 0.44, s * 0.32, s * 0.06);
+  // Skids
+  ctx.strokeStyle = INK;
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sx * s * 0.28, -s * 0.2); ctx.lineTo(sx * s * 0.28, s * 0.24); ctx.stroke(); }
+  // Body
+  ctx.fillStyle = '#4f76a8';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.05, s * 0.24, s * 0.3, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#8fd2ff';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.2, s * 0.14, s * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Side guns
+  for (const sx of [-1, 1]) {
+    ctx.fillStyle = '#2a2f3a';
+    ctx.fillRect(sx * s * 0.26 - s * 0.03, -s * 0.3, s * 0.06, s * 0.22);
+    if (firing && Math.sin(t * 60 + sx) > 0) {
+      ctx.fillStyle = '#ffd23a';
+      ctx.beginPath(); ctx.arc(sx * s * 0.26, -s * 0.34, s * 0.06, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // Rotor blur + blades
+  ctx.fillStyle = 'rgba(40,40,60,.18)';
+  ctx.beginPath(); ctx.ellipse(0, -s * 0.05, s * 0.75, s * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(30,30,45,.85)';
+  ctx.lineWidth = Math.max(2, s * 0.06);
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 2; k++) {
+    const a = t * 30 + k * Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * s * 0.72, -s * 0.05 + Math.sin(a) * s * 0.72); ctx.lineTo(-Math.cos(a) * s * 0.72, -s * 0.05 - Math.sin(a) * s * 0.72); ctx.stroke();
+  }
+  ctx.fillStyle = INK;
+  ctx.beginPath(); ctx.arc(0, -s * 0.05, s * 0.05, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 
 function icon(name, color = '#ffc632', size = 28) {
   return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${ICONS[name](color)}</svg>`;

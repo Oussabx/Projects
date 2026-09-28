@@ -726,7 +726,121 @@ const UI = (() => {
     setTab(toTab);
   }
 
+  // ---------- Support calls, unlocked by a rewarded ad ----------
+
+  let adOpen = false;
+
+  function buildAbilities() {
+    const btn = a => `<button class="ab-btn" data-ab="${a.id}" style="--c:${a.color}" aria-label="${a.name}, watch an ad to use">
+      <span class="ab-icon">${icon(a.icon, a.color, 40)}</span><span class="ab-cd tx"></span>
+      <span class="ab-ad">${icon('ad', '', 18)}</span><span class="ab-name tx">${a.name}</span></button>`;
+    $('#ab-left').innerHTML = ABILITIES.slice(0, 2).map(btn).join('');
+    $('#ab-right').innerHTML = ABILITIES.slice(2).map(btn).join('');
+    document.querySelectorAll('.ab-btn').forEach(b => b.addEventListener('click', () => requestAbility(b.dataset.ab)));
+  }
+
+  function requestAbility(id) {
+    if (adOpen || paused || $('#game-view').hidden) return;
+    const a = ABILITIES.find(x => x.id === id);
+    if (!a) return;
+    if (!Game.abilityReady(id)) {
+      const el = document.querySelector(`.ab-btn[data-ab="${id}"]`);
+      if (el) { el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope'); }
+      Sound.play('block');
+      return;
+    }
+    Sound.play('click');
+    Game.pause();
+    adOpen = true;
+    Ads.showRewarded(a, rewarded => {
+      adOpen = false;
+      Game.resume();
+      if (rewarded) Game.useAbility(id);
+      else toast('Watch the full ad to call in support');
+    });
+  }
+
+  // Rewarded ad. This is a built-in demo ad; a real ad network (e.g. AdMob in the Android app)
+  // plugs in here: show its rewarded ad and call done(true) only when it reports the reward was earned.
+  const AD_SECONDS = 5;
+  const Ads = {
+    showRewarded(a, done) {
+      const view = $('#ad-view'), claim = $('#ad-claim'), claimText = $('#ad-claim-text'), timer = $('#ad-timer'), fill = $('#ad-bar-fill');
+      $('#ad-body').innerHTML = `<canvas class="ad-canvas" id="ad-canvas" width="600" height="420"></canvas>
+        <div class="ad-title tx">${a.name.toUpperCase()}</div><div class="ad-desc">${a.desc}</div>
+        <div class="ad-note">Demo ad. Real video ads show here once an ad network is connected.</div>`;
+      view.hidden = false;
+      claim.disabled = true;
+      const cv = $('#ad-canvas'), c = cv.getContext('2d');
+      const t0 = performance.now();
+      let raf = 0, earned = false;
+      const frame = now => {
+        const t = (now - t0) / 1000, left = Math.max(0, AD_SECONDS - t);
+        fill.style.width = `${Math.min(1, t / AD_SECONDS) * 100}%`;
+        timer.textContent = left > 0 ? `Reward in ${Math.ceil(left)}s` : 'Reward earned!';
+        if (left <= 0 && !earned) {
+          earned = true;
+          claim.disabled = false;
+          claim.classList.add('pulse');
+          Sound.play('coin');
+        }
+        claimText.textContent = earned ? `Call ${a.name}!` : `Wait ${Math.ceil(left)}…`;
+        drawAdScene(c, cv.width, cv.height, a.id, t);
+        raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+      const close = rewarded => {
+        cancelAnimationFrame(raf);
+        view.hidden = true;
+        claim.classList.remove('pulse');
+        claim.onclick = null; $('#ad-close').onclick = null;
+        done(rewarded);
+      };
+      claim.onclick = () => { if (earned) close(true); };
+      $('#ad-close').onclick = () => close(earned);
+    },
+  };
+
+  // Little animated showcase of the support call, used as the demo ad's video.
+  function drawAdScene(c, w, h, id, t) {
+    const sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, id === 'freeze' ? '#9fdcff' : '#5ec8ff');
+    sky.addColorStop(1, id === 'freeze' ? '#e8f7ff' : '#bfeaff');
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    // Road in perspective
+    c.fillStyle = '#6a6f7c';
+    c.beginPath(); c.moveTo(w * 0.42, h * 0.35); c.lineTo(w * 0.58, h * 0.35); c.lineTo(w * 0.95, h); c.lineTo(w * 0.05, h); c.fill();
+    c.fillStyle = id === 'freeze' ? '#f4fbff' : '#5aa845';
+    c.fillRect(0, h * 0.33, w, h * 0.04);
+    c.strokeStyle = '#fff'; c.lineWidth = 6; c.setLineDash([30, 30]); c.lineDashOffset = -t * 120;
+    c.beginPath(); c.moveTo(w / 2, h * 0.37); c.lineTo(w / 2, h); c.stroke(); c.setLineDash([]);
+    const zx = [0.4, 0.5, 0.6];
+    const zColor = id === 'freeze' ? '#bfe8ff' : '#7cc24a';
+    zx.forEach((x, i) => {
+      const k = id === 'freeze' ? 0.55 : ((t * 0.25 + i * 0.33) % 1);
+      const s = 0.3 + k * 0.7;
+      drawZombie(c, w * (0.5 + (x - 0.5) * (0.6 + k * 1.4)), h * (0.4 + k * 0.45), 110 * s, id === 'freeze' ? 0 : t + i, { color: zColor, seed: i + 1 });
+    });
+    if (id === 'air') {
+      const k = (t * 0.45) % 1;
+      drawJet(c, w * (0.9 - k * 0.8), h * (1.1 - k * 1.3), 150, t);
+      if (Math.sin(t * 5) > 0.6) { c.fillStyle = 'rgba(255,176,46,.8)'; c.beginPath(); c.arc(w * 0.5, h * 0.62, 70, 0, Math.PI * 2); c.fill(); }
+    } else if (id === 'tank') {
+      drawTank(c, w * (0.5 + Math.sin(t) * 0.12), h * 0.98, 230, t, Math.sin(t * 4) > 0.8 ? 1 : 0);
+    } else if (id === 'heli') {
+      drawHeli(c, w * (0.5 + Math.sin(t * 1.2) * 0.2), h * 0.3 + Math.sin(t * 3) * 8, 170, t, true);
+    } else {
+      c.save(); c.translate(w * 0.5, h * 0.25); c.rotate(t * 0.8);
+      c.globalAlpha = 0.9;
+      const img = icon('freeze', '#8fe0ff', 160);
+      if (!drawAdScene.snow) { drawAdScene.snow = new Image(); drawAdScene.snow.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(img.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')); }
+      if (drawAdScene.snow.complete) c.drawImage(drawAdScene.snow, -80, -80, 160, 160);
+      c.restore();
+    }
+  }
+
   function togglePause(forceOn) {
+    if (adOpen) return;
     if (paused && !forceOn) {
       paused = false;
       closeModal();
@@ -845,6 +959,7 @@ const UI = (() => {
     $('#hud-pause').innerHTML = icon('pause');
     $('#hud-mute').addEventListener('click', () => { save.settings.muted = !save.settings.muted; persist(); applySettings(); });
     $('#hud-pause').addEventListener('click', () => togglePause());
+    buildAbilities();
     document.querySelectorAll('.navbar .tab').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.tab)));
     document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => setTab(+b.dataset.goto)));
     $('#profile-btn').addEventListener('click', settings);
@@ -877,7 +992,7 @@ const UI = (() => {
     if (document.fonts) document.fonts.ready.then(() => render(TAB_IDS[tab]));
   }
 
-  return { init, togglePause, toast };
+  return { init, togglePause, requestAbility, toast };
 })();
 
 UI.init();

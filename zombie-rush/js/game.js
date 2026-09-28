@@ -63,6 +63,8 @@ const Game = (() => {
       if (e.key === 'ArrowLeft' || e.key === 'a') keys.add(-1);
       if (e.key === 'ArrowRight' || e.key === 'd') keys.add(1);
       if (e.key === 'Escape' || e.key === 'p') UI.togglePause();
+      const ab = ABILITIES[+e.key - 1];
+      if (ab && !e.repeat) UI.requestAbility(ab.id);
     });
     window.addEventListener('keyup', e => {
       if (e.key === 'ArrowLeft' || e.key === 'a') keys.delete(-1);
@@ -117,6 +119,9 @@ const Game = (() => {
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
+      // Support calls start 60% charged.
+      abCd: Object.fromEntries(ABILITIES.map(a => [a.id, a.cd * 0.6])),
+      strikes: [], jet: null, tank: null, heli: null, frozen: 0,
     };
     hud.level.textContent = `${chIdx + 1}-${lvlIdx + 1} · ${cfg.name}`;
     hud.boss.hidden = true;
@@ -385,6 +390,7 @@ const Game = (() => {
       r.leaderCd += 1 / Math.max(rate * wpn.rate, 0.3);
     }
 
+    updateSupport(dt, move);
     updateBullets(dt);
     updateZombies(dt, move);
     updateBarrels(move);
@@ -562,6 +568,138 @@ const Game = (() => {
     r.shake = Math.max(r.shake, 0.12);
   }
 
+  // ---------- Support calls (airstrike, tank, helicopter, freeze) ----------
+
+  // Firepower of the whole squad per second, in leader-damage units, so support scales with upgrades and buffs.
+  function supportPower() {
+    const r = run, wpn = WEAPONS[r.weapon];
+    const rate = r.stats.rate * r.rateMult;
+    return Math.max(6, (r.squad * 0.3 + wpn.dmg * r.shots * wpn.rate) * rate);
+  }
+
+  function abilityReady(id) {
+    return !!run && run.state === 'playing' && run.abCd[id] <= 0 && !(id === 'tank' && run.tank) && !(id === 'heli' && run.heli);
+  }
+
+  function useAbility(id) {
+    const r = run;
+    if (!r || r.state !== 'playing' || !(id in r.abCd)) return false;
+    r.abCd[id] = ABILITIES.find(a => a.id === id).cd;
+    const P = supportPower();
+    if (id === 'air') {
+      r.jet = { t: 0, dur: 1.5 };
+      const targets = LANES.slice().sort(() => Math.random() - 0.5).slice(0, 4).map((x, i) => ({ x, z: rand(4, 12) }));
+      if (r.boss && r.boss.hp > 0) targets[0] = { x: r.boss.x, z: r.boss.z };
+      else {
+        const near = r.zombies.filter(z => z.z > 2 && z.z < 14 && !z.burrowed).sort((a, b) => a.z - b.z);
+        near.slice(0, 3).forEach((z, i) => { targets[i] = { x: z.x, z: z.z - z.speed * 0.5 }; });
+      }
+      targets.forEach((tg, i) => r.strikes.push({ x: tg.x, z: tg.z, t: 0.7 + i * 0.18, max: 0.7 + i * 0.18, m: P * 1.8 }));
+      Sound.play('warn');
+      showBanner('AIRSTRIKE INCOMING', 1.2, 'good');
+    } else if (id === 'tank') {
+      r.tank = { x: r.cx, z: -2.5, t: 0, dur: 8, shotCd: 0.9, recoil: 0, m: P * 0.9 };
+      Sound.play('thud');
+      showBanner('TANK SUPPORT', 1.2, 'good');
+    } else if (id === 'heli') {
+      r.heli = { x: 0, z: -3, t: 0, dur: 8, cd: 0, m: P * 0.8 / 14 };
+      showBanner('HELI SUPPORT', 1.2, 'good');
+    } else if (id === 'freeze') {
+      r.frozen = 4;
+      // Fireballs in flight and charging lightning fizzle out.
+      for (const f of r.fireballs) burst(f.x, f.z, '#bfe8ff', 8);
+      r.fireballs.length = 0;
+      r.bolts = r.bolts.filter(b => { if (!b.struck && b.owner) b.owner.bolt = null; return b.struck; });
+      r.fx.push({ type: 'flash', t: 0.25, max: 0.25 });
+      Sound.play('zap');
+      showBanner('FREEZE!', 1.2, 'good');
+    }
+    return true;
+  }
+
+  // Area blast: normal zombies are wiped out, big ones (brute, boss) and signs take heavy damage.
+  function blast(cx, cz, rad, m) {
+    const r = run;
+    const hitOne = t => { const { dmg } = bulletDamage(m); t.hp -= dmg; t.acc = (t.acc || 0) + dmg; if (t.accT === undefined) t.accT = 0; t.flash = 0.1; if (t.hp <= 0) onKill(t); };
+    for (const z of [...r.zombies]) {
+      if (z.burrowed || Math.hypot(z.x - cx, (z.z - cz) * 0.6) >= rad) continue;
+      if (z.mini) hitOne(z); else onKill(z);
+    }
+    for (const br of [...r.barrels]) if (Math.hypot(br.x - cx, (br.z - cz) * 0.6) < rad) hitOne(br);
+    if (r.boss && r.boss.hp > 0 && Math.hypot(r.boss.x - cx, (r.boss.z - cz) * 0.6) < rad + 0.3) hitOne(r.boss);
+    burst(cx, cz, '#ffb02e', 22); burst(cx, cz, '#ff5a3a', 14); burst(cx, cz, '#5a4a3a', 8);
+    r.fx.push({ type: 'ring', x: cx, z: cz, t: 0.4, max: 0.4, rad });
+    Sound.play('explode');
+    r.shake = Math.max(r.shake, 0.3);
+  }
+
+  // Closest live target ahead of z0, for tank shells and heli guns.
+  function supportTarget(z0, maxZ) {
+    const r = run;
+    let best = null;
+    for (const z of r.zombies) if (!z.burrowed && z.z > z0 + 0.8 && z.z < maxZ && (!best || z.z < best.z)) best = z;
+    if (!best && r.boss && r.boss.hp > 0 && r.boss.z < maxZ) best = r.boss;
+    return best;
+  }
+
+  function updateSupport(dt, move) {
+    const r = run;
+    for (const a of ABILITIES) r.abCd[a.id] = Math.max(0, r.abCd[a.id] - dt);
+    r.frozen = Math.max(0, r.frozen - dt);
+
+    if (r.jet) { r.jet.t += dt; if (r.jet.t > r.jet.dur) r.jet = null; }
+    for (let i = r.strikes.length - 1; i >= 0; i--) {
+      const s = r.strikes[i];
+      s.z -= move;
+      if ((s.t -= dt) <= 0) { blast(s.x, s.z, 0.42, s.m); r.strikes.splice(i, 1); }
+    }
+
+    const tk = r.tank;
+    if (tk) {
+      tk.t += dt;
+      tk.recoil = Math.max(0, tk.recoil - dt * 4);
+      const leaving = tk.t > tk.dur;
+      const goalZ = leaving ? 30 : 1.8;
+      tk.z += clamp(goalZ - tk.z, -3 * dt, (leaving ? 6 : 3) * dt);
+      const tgt = supportTarget(tk.z, 13);
+      tk.x += clamp((tgt ? tgt.x : 0) - tk.x, -0.9 * dt, 0.9 * dt);
+      // Crush anything small it drives into.
+      for (const z of [...r.zombies]) {
+        if (!z.burrowed && !z.mini && Math.abs(z.x - tk.x) < 0.3 && Math.abs(z.z - tk.z) < 0.5) { burst(z.x, z.z, z.color, 10); onKill(z); }
+      }
+      if (!leaving && (tk.shotCd -= dt) <= 0 && tgt && tk.z > 0.5) {
+        tk.shotCd = 0.8;
+        tk.recoil = 1;
+        const z0 = tk.z + 0.6, sp = 18;
+        const lead = tgt === r.boss ? 0 : (tgt.speed + RUN_SPEED) * (tgt.z - z0) / sp;
+        r.bullets.push({ x: tk.x, z: z0, vx: (tgt.x - tk.x) * sp / Math.max(0.5, tgt.z - lead - z0), m: tk.m, rocket: true, sp, splash: 0.4 });
+        Sound.play('explode');
+        r.shake = Math.max(r.shake, 0.08);
+      }
+      if (tk.z > 25) r.tank = null;
+    }
+
+    const hl = r.heli;
+    if (hl) {
+      hl.t += dt;
+      const leaving = hl.t > hl.dur;
+      hl.z += clamp((leaving ? 30 : 3) - hl.z, -4 * dt, (leaving ? 8 : 4) * dt);
+      hl.x = Math.sin(hl.t * 0.9) * 0.45;
+      if (!leaving && hl.z > 1) {
+        hl.cd -= dt;
+        while (hl.cd <= 0) {
+          hl.cd += 1 / 14;
+          const tgt = supportTarget(0.5, 14);
+          if (!tgt) break;
+          const sx = hl.x + (Math.random() < 0.5 ? -0.12 : 0.12), z0 = 1, sp = BULLET_SPEED;
+          r.bullets.push({ x: sx, z: z0, vx: (tgt.x - sx) * sp / Math.max(0.5, tgt.z - z0), m: hl.m });
+          Sound.play('shoot');
+        }
+      }
+      if (hl.z > 25) r.heli = null;
+    }
+  }
+
   function onKill(t) {
     const r = run;
     if (r.zombies.includes(t)) {
@@ -669,6 +807,17 @@ const Game = (() => {
     const r = run;
     // Screamers whip up every zombie in their lane nearby.
     const screams = r.zombies.filter(z => z.scream && !z.burrowed);
+    if (r.frozen > 0) {
+      // Frozen solid: nobody walks or attacks, and anything the squad reaches shatters harmlessly.
+      for (const z of [...r.zombies]) {
+        z.flash = Math.max(0, z.flash - dt);
+        z.z -= move;
+        if (z.z < 0.45) { burst(z.x, Math.max(0, z.z), '#bfe8ff', 12); Sound.play('block'); onKill(z); }
+      }
+      for (const b of r.bolts) if (b.owner) b.owner.bolt = null;
+      r.bolts.length = 0;
+      return;
+    }
     for (let i = r.zombies.length - 1; i >= 0; i--) {
       const z = r.zombies[i];
       z.t += dt;
@@ -816,8 +965,9 @@ const Game = (() => {
 
   function updateBoss(dt) {
     const r = run, b = r.boss;
-    b.t += dt;
     b.flash = Math.max(0, b.flash - dt);
+    if (r.frozen > 0) return;
+    b.t += dt;
     if (b.z > 7) b.z -= 3 * dt;
     else if (b.z > 0.9) b.z -= BOSS_MARCH * dt;
     else {
@@ -1095,6 +1245,17 @@ const Game = (() => {
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.3 * roadW, 0.09 * roadW, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    // Airstrike targets: shrinking crosshair rings
+    for (const s of r.strikes) {
+      const p = proj(s.x, s.z), k = s.t / s.max;
+      const rx = 0.42 * XS * roadW * p.s, ry = 0.14 * roadW * p.s;
+      ctx.strokeStyle = `rgba(255,40,40,${0.6 + 0.4 * Math.sin(r.t * 24)})`;
+      ctx.fillStyle = 'rgba(255,40,40,.18)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, rx * (0.2 + 0.8 * k), ry * (0.2 + 0.8 * k), 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - rx * 1.2, p.y); ctx.lineTo(p.x + rx * 1.2, p.y); ctx.moveTo(p.x, p.y - ry * 1.4); ctx.lineTo(p.x, p.y + ry * 1.4); ctx.stroke();
+    }
 
     // Depth-sorted scene
     const list = [];
@@ -1112,10 +1273,14 @@ const Game = (() => {
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
-      list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawZombie(ctx, p.x, p.y, 0.8 * b.size * roadW * p.s, b.t, { color: b.color, flash: b.flash, wide: 1.2, boss: true, final: b.final, shirt: '#4a4f66' }); } });
+      list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawZombie(ctx, p.x, p.y, 0.8 * b.size * roadW * p.s, b.t, { color: r.frozen > 0 ? '#bfe8ff' : b.color, flash: b.flash, wide: 1.2, boss: true, final: b.final, shirt: '#4a4f66' }); } });
     }
     if (!(r.state === 'ending' && r.hp <= 0)) {
       list.push({ z: 0, fn: drawPlayer });
+    }
+    if (r.tank) {
+      const tk = r.tank;
+      list.push({ z: tk.z, fn: () => { if (tk.z <= -CAM_D + 1) return; const p = proj(tk.x, tk.z); drawTank(ctx, p.x, p.y, 0.75 * roadW * p.s, r.t, tk.recoil); } });
     }
     list.sort((a, b) => b.z - a.z);
     for (const it of list) it.fn();
@@ -1159,6 +1324,16 @@ const Game = (() => {
       const p = proj(x, z);
       const arc = Math.sin(f * Math.PI) * roadW * 1.1 + 0.4 * roadW * p.s;
       drawRock(ctx, p.x, p.y - arc, 0.14 * roadW * p.s + 4, r.t);
+    }
+
+    // Support aircraft fly above everything on the road.
+    if (r.heli) {
+      const hl = r.heli, p = proj(hl.x, hl.z);
+      drawHeli(ctx, p.x, p.y - 1.25 * roadW * p.s - Math.sin(r.t * 2) * 4, 0.9 * roadW * p.s, r.t, hl.t < hl.dur && hl.z > 1);
+    }
+    if (r.jet) {
+      const k = r.jet.t / r.jet.dur;
+      drawJet(ctx, W * (0.62 - 0.24 * k), H * (1.15 - 1.5 * k), roadW * 0.8, r.t);
     }
 
     // FX
@@ -1227,6 +1402,16 @@ const Game = (() => {
       }
     }
 
+    // Frost over the screen while frozen
+    if (r.frozen > 0) {
+      const a = Math.min(1, r.frozen, 4 - r.frozen + 0.2);
+      const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.8);
+      g.addColorStop(0, `rgba(170,225,255,${0.16 * a})`);
+      g.addColorStop(1, `rgba(215,245,255,${0.75 * a})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+
     // Floating numbers
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1289,8 +1474,17 @@ const Game = (() => {
       ctx.strokeStyle = 'rgba(255,90,60,.7)'; ctx.lineWidth = Math.max(1.5, 3 * p.s);
       for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(p.x + k * h * 0.2, p.y - h * 1.05); ctx.lineTo(p.x + k * h * 0.2, p.y - h * 1.3); ctx.stroke(); }
     }
-    drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
+    drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: run.frozen > 0 ? '#bfe8ff' : z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
       helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop, zap: z.zap, charging: !!z.bolt && !z.bolt.struck });
+    if (run.frozen > 0) {
+      // Encased in ice
+      ctx.fillStyle = 'rgba(190,235,255,.45)'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1.5, 2.5 * p.s);
+      const bw = h * (z.mini ? 0.95 : 0.7), bh = h * 1.12;
+      ctx.beginPath(); ctx.moveTo(p.x - bw / 2, p.y); ctx.lineTo(p.x - bw * 0.56, p.y - bh * 0.7); ctx.lineTo(p.x - bw * 0.3, p.y - bh);
+      ctx.lineTo(p.x + bw * 0.4, p.y - bh * 0.95); ctx.lineTo(p.x + bw * 0.55, p.y - bh * 0.4); ctx.lineTo(p.x + bw / 2, p.y); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x - bw * 0.3, p.y - bh * 0.8); ctx.lineTo(p.x - bw * 0.1, p.y - bh * 0.55); ctx.stroke();
+    }
     if (z.mini) {
       // Miniboss: big named health bar
       const w = 0.9 * roadW * p.s + 40, y = p.y - h * 1.18;
@@ -1460,7 +1654,22 @@ const Game = (() => {
     if (r.rage > 0) chip('rage', 'fire', '#ff4d5e', `${Math.ceil(r.rage)}s`);
     const html = chips.join('');
     if (html !== lastBuffs) { hud.buffs.innerHTML = html; lastBuffs = html; }
+
+    // Support buttons: cooldown sweep + seconds left, glow when ready.
+    for (const a of ABILITIES) {
+      const el = abBtns[a.id] || (abBtns[a.id] = document.querySelector(`.ab-btn[data-ab="${a.id}"]`));
+      if (!el) continue;
+      const left = r.abCd[a.id], ready = abilityReady(a.id);
+      const busy = (a.id === 'tank' && r.tank) || (a.id === 'heli' && r.heli) || (a.id === 'freeze' && r.frozen > 0);
+      const p = busy ? 1 : left / a.cd;
+      const txt = busy ? '' : left > 0 ? String(Math.ceil(left)) : '';
+      if (el._p !== p.toFixed(3)) { el._p = p.toFixed(3); el.style.setProperty('--p', el._p); }
+      if (el._txt !== txt) { el._txt = txt; el.querySelector('.ab-cd').textContent = txt; }
+      el.classList.toggle('ready', ready);
+      el.classList.toggle('active', !!busy);
+    }
   }
+  const abBtns = {};
 
   function loop(now) {
     if (!run || (run.state !== 'playing' && run.state !== 'ending')) return;
@@ -1474,5 +1683,5 @@ const Game = (() => {
   }
 
   // debug(): read-only peek at the current run, used by automated playtests.
-  return { init, start, pause, resume, quit, debug: () => run };
+  return { init, start, pause, resume, quit, useAbility, abilityReady, debug: () => run };
 })();

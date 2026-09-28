@@ -276,3 +276,11 @@ const BOT_NAMES = [
   'Zulu', 'Tango', 'Nomad', 'Pebbles', 'Shadow', 'Rex', 'Duke', 'Waffles', 'Onyx', 'Scout', 'Fury',
   'Iceman', 'Blaze',
 ];
+
+// In-level support calls. Each one is unlocked by watching a rewarded ad, then recharges.
+const ABILITIES = [
+  { id: 'air', name: 'Airstrike', icon: 'jet', cd: 18, color: '#ff8a1f', desc: 'A jet drops 4 bombs on the horde.' },
+  { id: 'tank', name: 'Tank', icon: 'tank', cd: 28, color: '#7fb04e', desc: 'A tank rolls in, shelling and crushing zombies.' },
+  { id: 'heli', name: 'Helicopter', icon: 'heli', cd: 25, color: '#4f9cf0', desc: 'A gunship rains bullets for 8 seconds.' },
+  { id: 'freeze', name: 'Freeze', icon: 'freeze', cd: 30, color: '#8fe0ff', desc: 'Everything freezes solid for 4 seconds.' },
+];
