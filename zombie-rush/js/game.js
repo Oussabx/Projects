@@ -5,9 +5,14 @@ const Game = (() => {
   const Z_FAR = 40;        // spawn distance
   const CAM_D = 9;         // camera distance behind the player
   const ROAD = 1;          // road half-width in world units
-  const BULLET_SPEED = 30;
-  const RANGE = 13;        // bullets fade out here, so fights happen mid-screen
-  const RUN_SPEED = 2;        // you creep forward; enemies walk to you
+  const BULLET_SPEED = 22;
+  const RANGE = 13;
+  const BOSS_HP_MULT = 6;
+  const BOSS_MARCH = 0.3;    // units/s once the boss is in range
+  const BOSS_ENRAGE = 10;    // seconds before it throws twice as often        // bullets fade out here, so fights happen mid-screen
+  const RUN_SPEED = 1.2;      // you creep forward slowly; zombies shamble toward you
+  const LANES = [-0.72, -0.36, 0, 0.36, 0.72];   // zombies walk straight down one of these
+  const ZOMBIE_PACE = 0.3;    // zombies walk really slowly
   const MAX_SHOTS = 5;
   const MAX_SQUAD = 500;
   const SHOW_SQUAD = 130;   // soldiers drawn; the rest are only counted
@@ -98,7 +103,7 @@ const Game = (() => {
     const stats = playerStats();
     onEnd = endCallback;
     run = {
-      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, len: Math.round(cfg.length * 0.4), theme: CHAPTERS[chIdx].theme,
+      chIdx, lvlIdx, gl: chIdx * 6 + lvlIdx, cfg, stats, len: Math.round(cfg.length * 0.3), theme: CHAPTERS[chIdx].theme,
       hp: stats.hp, maxHp: stats.hp,
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
@@ -192,29 +197,20 @@ const Game = (() => {
 
   function spawnZombie(x, z, type, gid = 0) {
     const zt = ZOMBIE_TYPES[type];
-    const hp = Math.round(run.cfg.zhp * zt.hpMult);
+    const hp = Math.round(run.cfg.zhp * zt.hpMult * 3);   // fewer, individual zombies, so each one is tougher
     run.zombies.push({
       gid, acc: 0, accT: 0, seed: Math.random() * 10,
-      type, x, z, hp, maxHp: hp, speed: zt.speed * 1.6 * rand(0.85, 1.15), size: zt.size,
+      type, x, z, hp, maxHp: hp, speed: zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
       color: zombieSkin(type, zt), score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
     });
   }
 
-  function spawnGroup(z) {
-    const cfg = run.cfg;
-    const early = Math.max(0, 3 - run.gl) / 3;   // 1 on level 1, fades to 0 by level 4
-    const count = Math.min(40, Math.round((10 + Math.random() * 8) * cfg.density * (1 - early * 0.35) + Math.min(run.gl, 12) * 1.2));
-    const cx = rand(-0.45, 0.45);
-    const gid = run.nextGid++;
-    run.groups[gid] = { total: count, alive: count };
-    // Packed crowd, like the ad's enemy squads
-    const cols = Math.ceil(Math.sqrt(count * 1.3));
-    for (let i = 0; i < count; i++) {
-      const col = i % cols, row = Math.floor(i / cols);
-      const x = clamp(cx + (col - (cols - 1) / 2) * 0.17 + rand(-0.04, 0.04), -0.92, 0.92);
-      spawnZombie(x, z + row * 0.32 + rand(-0.08, 0.08), zombieType(), gid);
-    }
+  // One zombie at a time (sometimes two in different lanes), each walking straight down its lane.
+  function spawnSingle(z) {
+    const lanes = LANES.slice().sort(() => Math.random() - 0.5);
+    const n = run.gl >= 4 && Math.random() < 0.35 ? 2 : 1;
+    for (let i = 0; i < n; i++) spawnZombie(lanes[i], z + rand(-0.3, 0.3), zombieType());
   }
 
   // Barrels carry a reward on top: shoot the number to 0 to claim it.
@@ -232,20 +228,23 @@ const Game = (() => {
   }
 
   function gateOption(good) {
+    const gain = () => Math.round(rand(4, 8) + run.gl * 1.1 + Math.max(0, 3 - run.gl) * 1.5);
     if (good) {
       return pick([
-        { type: 'squad', val: Math.round(rand(4, 9) + run.gl * 0.8) },
-        { type: 'squad', val: Math.round(rand(4, 9) + run.gl * 0.8) },
+        { type: 'squad', val: gain() }, { type: 'squad', val: gain() }, { type: 'squad', val: gain() },
         { type: 'mult', val: 2 },
+        { type: 'drop', drop: 'minigun', val: 1 }, { type: 'drop', drop: 'rocket', val: 1 },
+        { type: 'drop', drop: 'shield', val: 1 }, { type: 'drop', drop: 'rage', val: 1 },
+        { type: 'drop', drop: 'grenade', val: 1 }, { type: 'drop', drop: 'coins', val: 1 },
+        { type: 'heal', val: 30 },
         { type: 'dmg', val: Math.round(rand(15, 40)) },
         { type: 'rate', val: Math.round(rand(15, 40)) },
         { type: 'shot', val: 1 },
-        { type: 'heal', val: 30 },
       ]);
     }
     return pick([
-      { type: 'squad', val: -Math.round(rand(8, 20) + run.gl * 2) },
-      { type: 'squad', val: -Math.round(rand(8, 20) + run.gl * 2) },
+      { type: 'squad', val: -Math.round(rand(6, 14) + run.gl * 1.5) },
+      { type: 'squad', val: -Math.round(rand(6, 14) + run.gl * 1.5) },
       { type: 'dmg', val: -Math.round(rand(10, 30)) },
       { type: 'rate', val: -Math.round(rand(10, 30)) },
     ]);
@@ -256,7 +255,7 @@ const Game = (() => {
     let b = gateOption(Math.random() < (run.gl < 2 ? 0.25 : 0.45));
     if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
-    const hpFor = o => o.val >= 0 ? Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5 : 0;
+    const hpFor = o => o.val >= 0 ? Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5 : 0;
     run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
   }
 
@@ -264,6 +263,7 @@ const Game = (() => {
     const v = Math.round(g.val);
     const sign = v >= 0 ? '+' : '';
     if (g.type === 'squad') return `${sign}${v}`;
+    if (g.type === 'drop') return { minigun: 'MINIGUN', rocket: 'ROCKETS', shield: 'SHIELD', rage: 'RAGE x2', grenade: 'GRENADE', coins: `+${25 + run.gl * 15} $` }[g.drop];
     if (g.type === 'mult') return 'x2';
     if (g.type === 'dmg') return `DMG ${sign}${v}%`;
     if (g.type === 'rate') return `FIRE ${sign}${v}%`;
@@ -273,8 +273,12 @@ const Game = (() => {
 
   function spawnBoss() {
     const b = run.cfg.boss;
+    // Bosses are a damage check: they keep marching in, so you need the buffs you picked up on the road.
+    // Gentler on the first two levels so new players can learn the buff picks.
+    const mult = run.gl === 0 ? 2.5 : run.gl === 1 ? 4 : BOSS_HP_MULT * (1 + Math.min(run.gl, 12) * 0.06);
+    const hp = Math.round(b.hp * mult);
     run.boss = {
-      ...b, x: 0, z: 24, hp: b.hp, maxHp: b.hp, flash: 0, t: 0,
+      ...b, x: 0, z: 24, hp, maxHp: hp, flash: 0, t: 0, stomp: 0,
     };
     run.bossThrow = 2;
     run.bossSummon = 3;
@@ -321,17 +325,9 @@ const Game = (() => {
     if (!inBoss) {
       while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len - 10) {
         const z = r.nextSpawn - r.dist;
-        if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(15, 20); }
-        else if (Math.random() < 0.42 + Math.max(0, 3 - r.gl) * 0.05) spawnBarrel(z);
-        else spawnGroup(z);
-        r.nextSpawn += rand(3.3, 5.2) / r.cfg.density;
-      }
-      // Stragglers keep walking in between the big crowds.
-      r.trickle -= dt;
-      if (r.trickle <= 0) {
-        const n = 1 + Math.floor(Math.random() * (r.gl < 2 ? 2 : 3));
-        for (let i = 0; i < n; i++) spawnZombie(rand(-0.85, 0.85), Z_FAR - rand(1, 4), zombieType());
-        r.trickle = rand(1.1, 2) / r.cfg.density * (r.gl < 2 ? 1.6 : 1);
+        if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(11, 15); }
+        else spawnSingle(z);
+        r.nextSpawn += rand(1.6, 2.6) / r.cfg.density;
       }
     } else if (!r.boss) {
       spawnBoss();
@@ -620,7 +616,6 @@ const Game = (() => {
       z.t += dt;
       z.flash = Math.max(0, z.flash - dt);
       z.z -= move + z.speed * dt;
-      if (z.z < 14) z.x += clamp(r.x - z.x, -1, 1) * 0.6 * dt;
       if (z.z < 0.45 && z.z > -0.5 && contact(z.x, r.cfg.zdmg * z.contact, z.contact, 0.08 * z.size)) {
         if (z.gid && r.groups[z.gid]) r.groups[z.gid].alive--;
         burst(z.x, z.z, z.color, 8);
@@ -688,6 +683,7 @@ const Game = (() => {
     else if (g.type === 'heal') r.hp = Math.min(r.maxHp, r.hp + r.maxHp * g.val / 100);
     else if (g.type === 'squad') { if (g.val >= 0) addSquad(g.val); else loseSoldiers(-Math.round(g.val), r.cx, -0.6); }
     else if (g.type === 'mult') addSquad(Math.max(1, r.squad));
+    else if (g.type === 'drop') { applyDrop(g.drop, { x: g.side * 0.5, z: 2 }); return; }
     addText(W / 2, baseY - roadW * 1.1, gateLabel(g), good ? '#6fd3ff' : '#ff5a5a', 24, 1.2);
   }
 
@@ -696,6 +692,20 @@ const Game = (() => {
     b.t += dt;
     b.flash = Math.max(0, b.flash - dt);
     if (b.z > 7) b.z -= 3 * dt;
+    else if (b.z > 0.9) b.z -= BOSS_MARCH * dt;
+    else {
+      // It reached the squad: trample soldiers, then the leader.
+      b.stomp -= dt;
+      if (b.stomp <= 0) {
+        b.stomp = 0.6;
+        r.shake = 0.35;
+        Sound.play('thud');
+        if (r.squad > 0) loseSoldiers(Math.max(3, Math.ceil(r.squad * 0.25)), b.x, -0.6);
+        else hurtPlayer(b.dmg * 2.5);
+      }
+    }
+    const enraged = b.t > BOSS_ENRAGE;
+    if (enraged && !b.raged) { b.raged = true; showBanner('BOSS ENRAGED', 1.4, 'boss'); }
     b.x = Math.sin(b.t * 0.7) * 0.45;
 
     r.bossThrow -= dt;
@@ -706,13 +716,14 @@ const Game = (() => {
         r.rocks.push({ x0: b.x, z0: b.z, tx, t: 0, dur: 1.05 });
         Sound.play('throw');
       }
-      r.bossThrow = b.final ? 1.1 : Math.max(1.2, 2 - r.gl * 0.1);
+      r.bossThrow = (b.final ? 1.1 : Math.max(1.2, 2 - r.gl * 0.1)) * (enraged ? 0.55 : 1);
     }
     r.bossSummon -= dt;
     if (r.bossSummon <= 0) {
-      const n = 8 + Math.min(r.gl, 8) * 3;
-      for (let i = 0; i < n; i++) spawnZombie(rand(-0.8, 0.8), b.z + rand(-1, 2), zombieType());
-      r.bossSummon = 4.5;
+      // The boss calls a line of minions, one per lane.
+      const lanes = LANES.slice().sort(() => Math.random() - 0.5).slice(0, 2 + Math.min(3, Math.floor(r.gl / 4)));
+      for (const x of lanes) spawnZombie(x, b.z + rand(0, 1.5), zombieType());
+      r.bossSummon = 5;
     }
   }
 
@@ -969,7 +980,7 @@ const Game = (() => {
         list.push({ z: sl.z, fn: () => { const p = proj(sl.x, sl.z); drawTrooper(ctx, p.x, p.y, 0.4 * roadW * p.s, r.t, { phase: sl.ph }); } });
       }
     }
-    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.62 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb, seed: z.seed }); } });
+    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.62 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb, seed: z.seed }); if (z.hp < z.maxHp) hpBar(p.x, p.y - 0.72 * z.size * roadW * p.s, 0.34 * roadW * p.s, z.hp / z.maxHp); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
@@ -1011,7 +1022,7 @@ const Game = (() => {
       drawRocketShot(ctx, p.x, p.y - hy * p.s, Math.max(5, 0.13 * roadW * p.s), r.t);
     }
 
-    drawGroupCounters();
+
 
     // Rocks in flight
     for (const k of r.rocks) {
@@ -1101,7 +1112,16 @@ const Game = (() => {
     ctx.fillStyle = color; ctx.fillText(text, x, y);
   }
 
-  // Skull + bar + count over each enemy crowd.
+  function hpBar(x, y, w, f) {
+    w = Math.max(22, w);
+    const h = Math.max(4, w * 0.12);
+    ctx.fillStyle = 'rgba(20,19,43,.85)';
+    ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, h + 2);
+    ctx.fillStyle = f > 0.5 ? '#6fe06a' : f > 0.25 ? '#ffc933' : '#ff4d5e';
+    ctx.fillRect(x - w / 2, y, w * Math.max(0, f), h);
+  }
+
+  // Skull + bar + count over each enemy crowd (unused now that zombies come one by one).
   function drawGroupCounters() {
     const r = run;
     const g = {};
@@ -1187,6 +1207,14 @@ const Game = (() => {
       const good = s.val >= 0;
       if (s.broken) continue;
       drawGate(ctx, a.x, b.x, a.y, h, gateLabel(s), good, good ? { frac: s.hp / s.maxHp, text: fmtN(Math.max(0, Math.ceil(s.hp))), flash: s.flash } : null);
+      const cx = (a.x + b.x) / 2, topY = a.y - h - 0.08 * roadW * a.s, sz = 0.42 * roadW * a.s;
+      if (s.type === 'drop') {
+        if (s.drop === 'minigun' || s.drop === 'rocket') drawWeaponSide(ctx, s.drop, cx, topY - sz * 0.2, sz * 1.5, { rot: -0.15 });
+        else drawPickup(ctx, cx, topY - sz * 0.25, sz * 0.8, s.drop, run.t);
+      } else if (s.type === 'squad' && good) {
+        drawTrooper(ctx, cx - sz * 0.25, topY, sz * 0.7, 0, { back: false, phase: 1 });
+        drawTrooper(ctx, cx + sz * 0.25, topY, sz * 0.7, 0, { back: false, phase: 2 });
+      }
     }
   }
 
@@ -1258,5 +1286,6 @@ const Game = (() => {
     raf = requestAnimationFrame(loop);
   }
 
-  return { init, start, pause, resume, quit };
+  // debug(): read-only peek at the current run, used by automated playtests.
+  return { init, start, pause, resume, quit, debug: () => run };
 })();
