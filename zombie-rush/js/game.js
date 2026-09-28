@@ -1431,7 +1431,7 @@ const Game = (() => {
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
-      list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawZombie(ctx, p.x, p.y, 0.8 * b.size * roadW * p.s, b.t, { color: r.frozen > 0 ? '#bfe8ff' : b.color, flash: b.flash, wide: 1.2, boss: true, final: b.final, shirt: '#4a4f66' }); } });
+      list.push({ z: b.z, fn: () => { const p = proj(b.x, b.z); drawBoss(ctx, p.x, p.y, 0.8 * b.size * roadW * p.s, b.t, { color: r.frozen > 0 ? '#bfe8ff' : b.color, flash: b.flash, name: b.name, final: b.final, rage: !!b.raged }); } });
     }
     if (!(r.state === 'ending' && r.hp <= 0)) {
       list.push({ z: 0, fn: drawPlayer });
@@ -1517,7 +1517,7 @@ const Game = (() => {
       if (f.type === 'spark') {
         ctx.globalAlpha = a;
         ctx.fillStyle = f.color;
-        ctx.beginPath(); ctx.arc(f.sx, f.sy, f.r, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(f.sx, f.sy, Math.max(0.5, f.r), 0, Math.PI * 2); ctx.fill();
       } else if (f.type === 'plank') {
         ctx.globalAlpha = Math.min(1, a * 2);
         ctx.save(); ctx.translate(f.sx, f.sy); ctx.rotate(f.rot);

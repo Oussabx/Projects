@@ -614,6 +614,505 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
   ctx.restore();
 }
 
+// ---------- Bosses ----------
+// A hulking mutant: small hunched head, glowing eyes, roaring jaw, one or two mutated flesh arms with
+// bone claws, torn vest, ripped jeans and spiked boots. Every boss mixes its own parts (see BOSS_LOOKS).
+
+// arm: which arm is mutated (L, R or both). head: hair, mohawk, bald, horns, tophat, cowboy, bandana,
+// hood, gasmask, helmet, visor, longhair, plague. chest: ribs, mouth, core, plates, stitches.
+// growth: what bursts from the mutated shoulder. extra: accessories. crown: none, gold, junk, ice, fire.
+const BOSS_LOOKS = {
+  'Brute':               { arm: 'R', head: 'hair', chest: 'ribs', growth: 'bone', extra: [] },
+  'Chomper':             { arm: 'L', head: 'bald', chest: 'stitches', growth: 'bone', extra: ['chains'], jaw: 'maw' },
+  'Big Mouth':           { arm: 'R', head: 'mohawk', chest: 'mouth', growth: 'pustules', extra: [], jaw: 'maw' },
+  'Sewer Hulk':          { arm: 'both', head: 'bald', chest: 'ribs', growth: 'pustules', extra: ['drip', 'chains'] },
+  'Toxic Butcher':       { arm: 'L', head: 'bandana', chest: 'stitches', growth: 'bone', extra: ['cleaver', 'tank', 'apron'] },
+  'Mayor Rot':           { arm: 'R', head: 'tophat', chest: 'core', growth: 'bone', extra: ['sash', 'cape'], crown: 'none' },
+  'Sand Brute':          { arm: 'L', head: 'bandana', chest: 'ribs', growth: 'rock', extra: [] },
+  'Cactus Jack':         { arm: 'R', head: 'cowboy', chest: 'stitches', growth: 'cactus', extra: ['chains'] },
+  'Scrap King':          { arm: 'both', head: 'bald', chest: 'plates', growth: 'armor', extra: ['blades'], crown: 'junk' },
+  'Oil Slick':           { arm: 'L', head: 'hair', chest: 'mouth', growth: 'pustules', extra: ['drip', 'tank'] },
+  'Dune Stalker':        { arm: 'R', head: 'hood', chest: 'ribs', growth: 'bone', extra: ['blades'] },
+  'The Warlord':         { arm: 'L', head: 'helmet', chest: 'plates', growth: 'armor', extra: ['chains', 'cape', 'cleaver'], crown: 'none' },
+  'Yeti Brute':          { arm: 'R', head: 'longhair', chest: 'ribs', growth: 'ice', extra: ['fur'] },
+  'Frostbite':           { arm: 'L', head: 'bald', chest: 'core', growth: 'ice', extra: ['fur'], three: true },
+  'Ice Maw':             { arm: 'R', head: 'horns', chest: 'mouth', growth: 'ice', extra: [], jaw: 'maw' },
+  'Snow Hulk':           { arm: 'both', head: 'hair', chest: 'ribs', growth: 'ice', extra: ['fur', 'chains'] },
+  'Blizzard King':       { arm: 'L', head: 'longhair', chest: 'core', growth: 'ice', extra: ['cape', 'fur'], crown: 'ice' },
+  'The Frost Titan':     { arm: 'both', head: 'horns', chest: 'plates', growth: 'ice', extra: ['cape', 'fur'], crown: 'ice' },
+  'Bog Crawler':         { arm: 'R', head: 'longhair', chest: 'ribs', growth: 'pustules', extra: ['drip'] },
+  'Sludge Belly':        { arm: 'L', head: 'bald', chest: 'mouth', growth: 'pustules', extra: ['drip', 'tank'] },
+  'Swamp Hag':           { arm: 'R', head: 'longhair', chest: 'stitches', growth: 'bone', extra: ['drip', 'chains'], three: true },
+  'Mutant Brute':        { arm: 'both', head: 'mohawk', chest: 'core', growth: 'pustules', extra: [], three: true },
+  'Dr. Rot':             { arm: 'L', head: 'gasmask', chest: 'stitches', growth: 'bone', extra: ['tank', 'apron'] },
+  'The Plague Lord':     { arm: 'both', head: 'plague', chest: 'core', growth: 'pustules', extra: ['cape', 'drip', 'chains'], crown: 'gold' },
+  'Ember Brute':         { arm: 'R', head: 'hair', chest: 'ribs', growth: 'rock', extra: ['cracks'] },
+  'Magma Maw':           { arm: 'L', head: 'horns', chest: 'mouth', growth: 'rock', extra: ['cracks'], jaw: 'maw' },
+  'Obsidian Golem':      { arm: 'both', head: 'bald', chest: 'plates', growth: 'rock', extra: ['cracks'] },
+  'Fire Priest':         { arm: 'R', head: 'hood', chest: 'core', growth: 'bone', extra: ['cracks', 'cape', 'chains'] },
+  'Lava Behemoth':       { arm: 'both', head: 'horns', chest: 'core', growth: 'rock', extra: ['cracks', 'drip'] },
+  'The Inferno Emperor': { arm: 'both', head: 'horns', chest: 'core', growth: 'rock', extra: ['cracks', 'cape'], crown: 'fire' },
+  'Neon Brute':          { arm: 'R', head: 'mohawk', chest: 'ribs', growth: 'bone', extra: ['blades'] },
+  'Glitch':              { arm: 'L', head: 'visor', chest: 'core', growth: 'armor', extra: ['blades'] },
+  'Subway Terror':       { arm: 'R', head: 'gasmask', chest: 'ribs', growth: 'pustules', extra: ['chains', 'tank'] },
+  'Skyline Ripper':      { arm: 'both', head: 'visor', chest: 'plates', growth: 'armor', extra: ['blades'] },
+  'Royal Guard':         { arm: 'L', head: 'helmet', chest: 'plates', growth: 'armor', extra: ['cape', 'cleaver'] },
+  'The Zombie King':     { arm: 'both', head: 'longhair', chest: 'core', growth: 'bone', extra: ['cape', 'chains', 'sash'], crown: 'gold' },
+};
+
+function bossLook(name, final) {
+  let look = BOSS_LOOKS[name];
+  if (!look) {
+    // Unknown names still get a stable, distinct mix.
+    let h = [...(name || 'boss')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 11);
+    const pickH = arr => arr[(h = (h * 1103515245 + 12345) >>> 0) % arr.length];
+    look = { arm: pickH(['L', 'R', 'both']), head: pickH(['hair', 'mohawk', 'bald', 'horns', 'hood', 'gasmask', 'longhair']),
+      chest: pickH(['ribs', 'mouth', 'core', 'plates', 'stitches']), growth: pickH(['bone', 'pustules', 'rock', 'armor']), extra: [pickH(['chains', 'drip', 'blades', 'tank'])] };
+  }
+  return { jaw: 'roar', three: false, crown: final ? 'gold' : 'none', ...look };
+}
+
+function drawBoss(ctx, cx, footY, height, t, opts = {}) {
+  const { color = '#8fa585', flash = 0, name = '', final = false, rage = false, wide = 1.15 } = opts;
+  const L = bossLook(name, final);
+  // Hits flash bright instead of turning solid white, so the boss stays readable under fire.
+  const hit = false;
+  const W = c => hit ? '#ffffff' : c;
+  const skin = W(color), skinDk = W(shadeHex(color, -0.3)), skinLt = W(shadeHex(color, 0.3)), sore = W(shadeHex(color, -0.45));
+  const fire = L.extra.includes('cracks'), ice = L.growth === 'ice';
+  const flesh = W(fire ? '#b0401e' : ice ? '#7a4a6a' : '#9a302a'), fleshDk = W(fire ? '#6a1e0a' : ice ? '#4a2a4a' : '#5e1a18');
+  const bone = W(ice ? '#e8fbff' : '#f0e2c0'), denim = W('#34363f'), denimDk = W('#24252c'), leather = W('#4a3524');
+  const glowC = fire ? '#ffb02e' : ice ? '#9fe8ff' : rage ? '#ff4a3a' : '#ffe680';
+  const lw = 3;
+  const walk = t * 3.2;
+  const sw = Math.sin(walk);
+  const breathe = Math.sin(t * 2.2) * 1.2;
+  const u = height / 100;
+  const mutL = L.arm === 'L' || L.arm === 'both', mutR = L.arm === 'R' || L.arm === 'both';
+
+  ctx.save();
+  ctx.translate(cx, footY);
+  ctx.scale(u * wide, u);
+  if (flash > 0) ctx.filter = 'brightness(1.6) saturate(.7)';
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 50, 8, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Cape behind the body
+  if (L.extra.includes('cape')) {
+    const capeC = W(fire ? '#8a1e1e' : ice ? '#2f5f9a' : final ? '#6a1e8a' : '#5a1e1e');
+    ctx.beginPath();
+    ctx.moveTo(-30, -80); ctx.quadraticCurveTo(-48, -40, -44 + sw * 2, -6);
+    for (let i = 0; i <= 6; i++) ctx.lineTo(-44 + i * 14.6 + sw * 2, -6 + (i % 2 ? -7 : 0));
+    ctx.quadraticCurveTo(48, -40, 30, -80); ctx.closePath();
+    blob(ctx, capeC, lw);
+    ctx.fillStyle = hit ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,.2)';
+    ctx.beginPath(); ctx.moveTo(10, -78); ctx.quadraticCurveTo(40, -40, 40, -10); ctx.lineTo(20, -8); ctx.quadraticCurveTo(24, -40, 10, -78); ctx.fill();
+  }
+  // Canister strapped to the back, poking over the shoulder
+  if (L.extra.includes('tank')) {
+    const tc = W(fire ? '#c05a2a' : '#5aa02a');
+    rr(ctx, 6, -112, 20, 34, 8); blob(ctx, tc, lw);
+    ctx.fillStyle = hit ? '#fff' : 'rgba(255,255,255,.35)'; ctx.fillRect(10, -106, 4, 22);
+    rr(ctx, 11, -118, 10, 7, 2); blob(ctx, W('#5b6070'), 2);
+    ctx.fillStyle = W('#ffd23a'); ctx.beginPath(); ctx.moveTo(16, -101); ctx.lineTo(21, -93); ctx.lineTo(11, -93); ctx.closePath(); ctx.fill();
+  }
+
+  // Legs: wide stance, ripped jeans, heavy spiked boots
+  for (const s of [-1, 1]) {
+    const lift = Math.max(0, sw * s) * 5;
+    ctx.beginPath();
+    ctx.moveTo(s * 5, -46); ctx.lineTo(s * 26, -46); ctx.lineTo(s * 25, -14 - lift);
+    ctx.lineTo(s * 20, -11 - lift); ctx.lineTo(s * 15, -14 - lift); ctx.lineTo(s * 10, -11 - lift); ctx.lineTo(s * 6, -14 - lift);
+    ctx.closePath(); blob(ctx, denim, lw);
+    ctx.fillStyle = denimDk; ctx.fillRect(s * 15 - 1.5, -44, 3, 28 - lift);
+    ctx.beginPath(); ctx.ellipse(s * 15, -28 - lift * 0.5, 5, 3.5, 0.3 * s, 0, Math.PI * 2); blob(ctx, skinDk, 2);
+    // Boot
+    const by = -lift;
+    rr(ctx, s * 16 - 14, by - 16, 28, 14, 6); blob(ctx, leather, lw);
+    rr(ctx, s * 16 - 15, by - 5, 30, 6, 3); blob(ctx, bone, 2.4);
+    ctx.fillStyle = W('#9aa3ad');
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(s * 16 + k * 9 - 2.5, by - 1); ctx.lineTo(s * 16 + k * 9, by + 3); ctx.lineTo(s * 16 + k * 9 + 2.5, by - 1); ctx.fill(); }
+    ctx.strokeStyle = W('#8a7a5a'); ctx.lineWidth = 1.5;
+    for (const ly of [-13, -10]) { ctx.beginPath(); ctx.moveTo(s * 16 - 5, by + ly); ctx.lineTo(s * 16 + 5, by + ly); ctx.stroke(); }
+  }
+  // Belt with a hanging chain
+  rr(ctx, -27, -50, 54, 8, 3); blob(ctx, leather, 2.4);
+  rr(ctx, -5, -51, 10, 10, 2); blob(ctx, W('#c9a44a'), 2);
+  ctx.strokeStyle = W('#9aa3ad'); ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.moveTo(10, -44); ctx.quadraticCurveTo(18, -30 + sw * 2, 26, -44); ctx.stroke();
+
+  // Upper body leans forward and breathes
+  ctx.translate(0, breathe * 0.5 - Math.abs(sw) * 1.5);
+
+  // Hulking torso
+  ctx.beginPath();
+  ctx.moveTo(-24, -48);
+  ctx.lineTo(-38, -76); ctx.quadraticCurveTo(-20, -92, 0, -90); ctx.quadraticCurveTo(20, -92, 38, -76);
+  ctx.lineTo(24, -48); ctx.closePath();
+  blob(ctx, skin, lw);
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = skinDk; ctx.beginPath(); ctx.ellipse(26, -64, 14, 30, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skinLt; ctx.beginPath(); ctx.ellipse(-16, -80, 12, 5, -0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // Muscles: pecs and abs
+  ctx.strokeStyle = W('rgba(20,30,20,.35)'); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-26, -72); ctx.quadraticCurveTo(-12, -64, 0, -72); ctx.quadraticCurveTo(12, -64, 26, -72); ctx.stroke();
+  for (const y of [-62, -56]) { ctx.beginPath(); ctx.moveTo(-8, y); ctx.lineTo(8, y); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(0, -70); ctx.lineTo(0, -50); ctx.stroke();
+  ctx.fillStyle = sore;
+  for (const [x, y, r] of [[-18, -60, 2.5], [14, -80, 2], [20, -54, 1.8]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  // Torn vest hanging off the sides, plus a strap across the chest
+  const vest = W(L.extra.includes('apron') ? '#d8d2c0' : '#b8ae96');
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(s * 20, -89); ctx.lineTo(s * 37, -77); ctx.lineTo(s * 25, -49);
+    ctx.lineTo(s * 20, -54); ctx.lineTo(s * 17, -50); ctx.lineTo(s * 14, -58); ctx.lineTo(s * 16, -70);
+    ctx.closePath(); blob(ctx, vest, 2.4);
+  }
+  if (L.extra.includes('apron')) {
+    // Butcher's apron, bloodied
+    ctx.beginPath(); ctx.moveTo(-15, -70); ctx.lineTo(15, -70); ctx.lineTo(19, -30); ctx.lineTo(-19, -30); ctx.closePath(); blob(ctx, W('#e6e0d0'), 2.4);
+    ctx.fillStyle = hit ? 'rgba(0,0,0,0)' : 'rgba(140,20,20,.7)';
+    for (const [x, y, r] of [[-6, -58, 4], [7, -46, 5], [-10, -40, 3], [3, -64, 2.5]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.strokeStyle = leather; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(-26, -84); ctx.lineTo(22, -50); ctx.stroke();
+  if (L.extra.includes('sash')) {
+    ctx.strokeStyle = W('#c0303a'); ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(24, -86); ctx.lineTo(-22, -50); ctx.stroke();
+    ctx.fillStyle = W('#ffd23a'); ctx.beginPath(); ctx.arc(2, -68, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Chest: the mutation
+  if (L.chest === 'ribs') {
+    ctx.beginPath(); ctx.ellipse(-2, -64, 11, 9, 0, 0, Math.PI * 2); blob(ctx, W('#5a1a18'), 2.4);
+    ctx.strokeStyle = bone; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+    for (const y of [-69, -64.5, -60]) { ctx.beginPath(); ctx.moveTo(-10, y); ctx.quadraticCurveTo(-2, y - 3, 6, y); ctx.stroke(); }
+  } else if (L.chest === 'mouth') {
+    // A second mouth in the belly
+    const o = 3 + Math.abs(Math.sin(t * 4)) * 4;
+    ctx.beginPath(); ctx.ellipse(0, -60, 12, o, 0, 0, Math.PI * 2); blob(ctx, W('#3a0f12'), 2.4);
+    ctx.fillStyle = bone;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath(); ctx.moveTo(i * 4.5 - 2, -60 - o + 0.5); ctx.lineTo(i * 4.5, -60 - o + 5); ctx.lineTo(i * 4.5 + 2, -60 - o + 0.5); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(i * 4.5 - 2, -60 + o - 0.5); ctx.lineTo(i * 4.5, -60 + o - 5); ctx.lineTo(i * 4.5 + 2, -60 + o - 0.5); ctx.fill();
+    }
+  } else if (L.chest === 'core') {
+    const g = ctx.createRadialGradient(0, -64, 1, 0, -64, 12);
+    g.addColorStop(0, hit ? '#fff' : '#ffffff'); g.addColorStop(0.35, hit ? '#fff' : glowC); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -64, 12 + Math.sin(t * 6) * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = W('#3a1a18'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -64, 7, 0, Math.PI * 2); ctx.stroke();
+  } else if (L.chest === 'plates') {
+    const pc = W(fire ? '#3a3040' : ice ? '#bfe6f2' : '#6a7280');
+    for (const [x, y] of [[-11, -76], [11, -76], [-8, -62], [8, -62]]) { rr(ctx, x - 8, y - 6, 16, 12, 3); blob(ctx, pc, 2.4); }
+    ctx.fillStyle = W('#c9ced8'); for (const [x, y] of [[-15, -80], [15, -80], [-12, -66], [12, -66]]) { ctx.beginPath(); ctx.arc(x, y, 1.4, 0, Math.PI * 2); ctx.fill(); }
+  } else {
+    ctx.strokeStyle = W('#4a1a1a'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-12, -74); ctx.quadraticCurveTo(-2, -62, 10, -54); ctx.stroke();
+    for (let i = 0; i < 5; i++) { const x = -10 + i * 5, y = -72 + i * 4.2; ctx.beginPath(); ctx.moveTo(x - 3, y + 2); ctx.lineTo(x + 3, y - 2); ctx.stroke(); }
+  }
+  if (L.extra.includes('chains')) {
+    ctx.strokeStyle = W('#8a939e'); ctx.lineWidth = 2.6;
+    for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.ellipse(-30 + i * 7.5, -84 + i * 4, 3.4, 2, 0.5, 0, Math.PI * 2); ctx.stroke(); }
+  }
+  if (fire) {
+    // Glowing magma cracks across the skin
+    ctx.strokeStyle = hit ? '#fff' : `rgba(255,${150 + Math.sin(t * 5) * 40},40,.95)`; ctx.lineWidth = 2;
+    for (const pts of [[[-30, -76], [-24, -70], [-27, -62]], [[18, -84], [24, -76], [20, -68], [26, -60]], [[-8, -52], [-2, -56], [6, -52]]]) {
+      ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke();
+    }
+  }
+
+  // Arms. A mutated arm is a huge flesh mass with bone claws dragging near the ground.
+  const drawArm = (s, mutated) => {
+    const swing = Math.sin(walk + (s > 0 ? 0 : Math.PI)) * 3;
+    if (mutated) {
+      const ex = s * 50, ey = -50 + swing * 0.3, hx = s * 54 + swing * 0.5, hy = -18 + swing;
+      // Swollen muscle masses: bicep and a huge forearm, over a thick core limb
+      limb(ctx, s * 36, -74, ex, ey, 16, flesh, lw);
+      limb(ctx, ex, ey, hx, hy, 14, flesh, lw);
+      const mass = (x, y, rx, ry, rot) => {
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        if (hit) { blob(ctx, '#fff', lw); return; }
+        const g = ctx.createRadialGradient(x - s * rx * 0.3, y - ry * 0.4, 1, x, y, Math.max(rx, ry));
+        g.addColorStop(0, shadeHex(fire ? '#b0401e' : ice ? '#7a4a6a' : '#9a302a', 0.3)); g.addColorStop(0.6, flesh); g.addColorStop(1, fleshDk);
+        ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.stroke();
+      };
+      mass(s * 44, -62, 12, 15, s * 0.35);
+      mass(s * 53, -36, 13, 17, -s * 0.1);
+      // Patches of normal skin still clinging to the mutated arm
+      ctx.save(); ctx.beginPath(); ctx.ellipse(s * 53, -36, 13, 17, -s * 0.1, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(s * 46, -42, 7, 10, 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      // Muscle striations and veins
+      ctx.strokeStyle = fleshDk; ctx.lineWidth = 1.6;
+      for (const k of [-1, 0, 1]) {
+        ctx.beginPath(); ctx.moveTo(s * (40 + k * 4), -72); ctx.quadraticCurveTo(s * (48 + k * 3), -62, s * (45 + k * 4), -50); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(s * (50 + k * 4), -48); ctx.quadraticCurveTo(s * (58 + k * 3), -36, s * (54 + k * 3), -22); ctx.stroke();
+      }
+      ctx.fillStyle = bone;
+      for (const [x, y, r] of [[s * 48, -66, 3], [s * 58, -42, 2.6], [s * 51, -28, 3.2], [s * 60, -30, 2]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = fleshDk; ctx.lineWidth = 1.2; ctx.stroke(); }
+      if (!hit) { ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.ellipse(s * 41, -67, 3, 6, s * 0.4, 0, Math.PI * 2); ctx.ellipse(s * 49, -42, 3, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+      // Big claw hand
+      ctx.beginPath(); ctx.ellipse(hx, hy + 2, 13, 10, 0, 0, Math.PI * 2); blob(ctx, flesh, lw);
+      for (let k = 0; k < 4; k++) {
+        const fx = hx + (k - 1.5) * 6.5, tip = hy + 20 + (k === 0 || k === 3 ? -3 : 0);
+        ctx.beginPath(); ctx.moveTo(fx - 3.2, hy + 6); ctx.quadraticCurveTo(fx + s * 2, hy + 14, fx + (k - 1.5) * 1.5, tip); ctx.lineTo(fx + 3.2, hy + 7); ctx.closePath();
+        blob(ctx, bone, 2.2);
+      }
+      if (L.extra.includes('blades')) {
+        ctx.beginPath(); ctx.moveTo(ex + s * 6, ey - 4); ctx.lineTo(ex + s * 26, ey + 6); ctx.lineTo(ex + s * 6, ey + 8); ctx.closePath(); blob(ctx, W('#c9ced8'), 2.2);
+      }
+    } else {
+      const ex = s * 44, ey = -56 + swing * 0.3, hx = s * 42 + swing * 0.4, hy = -34 + swing;
+      limb(ctx, s * 32, -76, ex, ey, 16, skin, lw);
+      limb(ctx, ex, ey, hx, hy, 14, skin, lw);
+      ctx.fillStyle = sore; ctx.beginPath(); ctx.arc(ex, ey, 2.4, 0, Math.PI * 2); ctx.fill();
+      rr(ctx, hx - 9, hy - 9, 18, 7, 2); blob(ctx, leather, 2.2);
+      ctx.fillStyle = W('#9aa3ad'); for (const k of [-5, 0, 5]) { ctx.beginPath(); ctx.arc(hx + k, hy - 5.5, 1.3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.beginPath(); ctx.ellipse(hx, hy + 3, 9, 7, 0, 0, Math.PI * 2); blob(ctx, skin, lw);
+      for (let k = 0; k < 4; k++) {
+        const fx = hx + (k - 1.5) * 4.2;
+        limb(ctx, fx, hy + 6, fx + (k - 1.5) * 1.2, hy + 14, 3.4, skin, 1.8);
+        ctx.fillStyle = bone; ctx.beginPath(); ctx.arc(fx + (k - 1.5) * 1.2, hy + 15, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+      if (L.extra.includes('cleaver')) {
+        // Rusty cleaver gripped in the normal hand
+        ctx.save(); ctx.translate(hx, hy + 6); ctx.rotate(s * 0.25);
+        rr(ctx, -3, -4, 6, 16, 2); blob(ctx, leather, 2);
+        ctx.beginPath(); ctx.moveTo(-4 * s, 10); ctx.lineTo(18 * s, 10); ctx.lineTo(20 * s, 34); ctx.lineTo(-4 * s, 30); ctx.closePath();
+        ctx.fillStyle = W('#aab2bc'); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.4; ctx.stroke();
+        ctx.fillStyle = hit ? 'rgba(0,0,0,0)' : 'rgba(140,20,20,.75)'; ctx.beginPath(); ctx.arc(12 * s, 28, 4, 0, Math.PI * 2); ctx.arc(6 * s, 30, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+  };
+  drawArm(-1, mutL);
+  drawArm(1, mutR);
+
+  // What erupts from each mutated shoulder
+  const growth = s => {
+    const gx = s * 34, gy = -80;
+    ctx.beginPath(); ctx.ellipse(gx, gy + 4, 17, 14, 0, 0, Math.PI * 2); blob(ctx, L.growth === 'armor' ? W('#6a7280') : L.growth === 'rock' ? W('#4a4048') : flesh, lw);
+    if (L.growth === 'bone' || L.growth === 'pustules') {
+      ctx.fillStyle = bone;
+      for (const [x, y, r] of [[gx - s * 6, gy + 8, 3], [gx + s * 8, gy + 2, 2.5], [gx, gy - 2, 2]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    }
+    const spikes = L.growth === 'pustules' ? [] : [[-0.5, 22], [0.1, 28], [0.7, 20]];
+    for (const [a, len] of spikes) {
+      const bx = gx + Math.sin(a) * 8 * s, byy = gy - 4;
+      const tx = bx + Math.sin(a + 0.3 * s) * len * s, ty = byy - Math.cos(a) * len;
+      ctx.beginPath(); ctx.moveTo(bx - 4, byy + 2); ctx.lineTo(tx, ty); ctx.lineTo(bx + 4, byy + 2); ctx.closePath();
+      if (L.growth === 'ice') { ctx.fillStyle = W('rgba(190,240,255,.95)'); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke(); }
+      else if (L.growth === 'cactus') { blob(ctx, W('#4f9a4a'), 2.2); }
+      else if (L.growth === 'rock') { blob(ctx, W(fire ? '#2a2028' : '#6a5a50'), 2.2); }
+      else if (L.growth === 'armor') { blob(ctx, W('#aab2bc'), 2.2); }
+      else blob(ctx, bone, 2.2);
+    }
+    if (L.growth === 'cactus') { ctx.strokeStyle = W('#f0e6c0'); ctx.lineWidth = 1; for (let k = 0; k < 6; k++) { const x = gx + (k - 2.5) * 5, y = gy + (k % 2) * 6 - 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + s * 3, y - 3); ctx.stroke(); } }
+    if (L.growth === 'pustules') {
+      for (const [x, y, r] of [[gx - s * 4, gy - 8, 5], [gx + s * 9, gy - 4, 4], [gx + s * 2, gy - 14, 3.4]]) {
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); blob(ctx, W('#e8d890'), 1.8);
+        ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  };
+  if (mutL) growth(-1);
+  if (mutR) growth(1);
+  if (L.growth === 'armor' && !(mutL && mutR)) {
+    // Normal shoulder gets a metal pauldron too
+    const s = mutL ? 1 : -1;
+    ctx.beginPath(); ctx.ellipse(s * 30, -80, 13, 9, 0, Math.PI, 0); ctx.closePath(); blob(ctx, W('#8a939e'), 2.4);
+  }
+  if (L.extra.includes('fur')) {
+    // Fur collar
+    ctx.fillStyle = W('#e8eef2'); ctx.strokeStyle = INK; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    for (let i = 0; i <= 12; i++) { const a = Math.PI + i / 12 * Math.PI, rr2 = i % 2 ? 26 : 32; ctx.lineTo(Math.cos(a) * rr2, -84 + Math.sin(a) * rr2 * 0.35 + 6); }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  // Head: small, hunched low between the shoulders
+  ctx.save();
+  ctx.translate(0, -92);
+  ctx.rotate(Math.sin(walk * 0.5) * 0.08);
+  const skull = () => {
+    ctx.beginPath();
+    ctx.moveTo(-14, -2); ctx.bezierCurveTo(-17, -24, 17, -24, 14, -2);
+    ctx.lineTo(16, 8); ctx.bezierCurveTo(14, 18, -14, 18, -16, 8); ctx.closePath();
+  };
+  if (L.head === 'longhair') {
+    // Stringy locks hanging past the jaw
+    ctx.fillStyle = W(ice ? '#e8eef2' : '#3a2a22');
+    ctx.beginPath(); ctx.moveTo(-15, -14);
+    ctx.quadraticCurveTo(-24, 4, -21, 24);
+    for (const [x, y] of [[-17, 17], [-15, 27], [-11, 16], [11, 16], [15, 27], [17, 17]]) ctx.lineTo(x, y);
+    ctx.lineTo(21, 24); ctx.quadraticCurveTo(24, 4, 15, -14); ctx.closePath();
+    ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.stroke();
+  }
+  skull(); blob(ctx, skin, lw);
+  ctx.save(); skull(); ctx.clip();
+  ctx.fillStyle = skinDk; ctx.beginPath(); ctx.ellipse(11, 2, 8, 20, -0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(20,30,20,.18)'; ctx.beginPath(); ctx.ellipse(-9, 6, 4, 6, 0.3, 0, Math.PI * 2); ctx.ellipse(9, 6, 4, 6, -0.3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  skull(); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.stroke();
+
+  // Glowing eyes (a third one for the worst mutants)
+  const eyes = L.three ? [[-6.5, -5, 3.6], [6.5, -5, 3.6], [0, -12, 3]] : [[-6.5, -5, 4], [6.5, -5, 4]];
+  if (!['gasmask', 'visor', 'plague'].includes(L.head)) {
+    for (const [ex, ey, er] of eyes) {
+      ctx.fillStyle = hit ? '#ddd' : shadeHex(color, -0.65);
+      ctx.beginPath(); ctx.ellipse(ex, ey, er + 2.5, er + 2, 0, 0, Math.PI * 2); ctx.fill();
+      if (!hit) {
+        const g = ctx.createRadialGradient(ex, ey, 0, ex, ey, er * 2.4);
+        g.addColorStop(0, 'rgba(255,255,255,.9)'); g.addColorStop(0.3, glowC); g.addColorStop(1, 'rgba(255,230,120,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(ex, ey, er * 2.4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); blob(ctx, hit ? '#fff' : '#fff6c8', 1.6);
+      ctx.fillStyle = rage ? '#c0141e' : '#3a2a10'; ctx.beginPath(); ctx.arc(ex, ey + 0.4, er * 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+    // Furious brow
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.8; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-13, -12); ctx.lineTo(-2, -8); ctx.moveTo(2, -8); ctx.lineTo(13, -12); ctx.stroke();
+  }
+
+  // Jaw: roaring, or a huge unhinged maw
+  const maw = L.jaw === 'maw';
+  const open = (maw ? 8 : 5) + Math.abs(Math.sin(t * 3.5)) * (maw ? 6 : 3);
+  if (!['gasmask', 'plague', 'bandana'].includes(L.head)) {
+    const mw = maw ? 13 : 10;
+    ctx.beginPath();
+    ctx.moveTo(-mw, 3); ctx.quadraticCurveTo(0, 1, mw, 3);
+    ctx.quadraticCurveTo(mw - 1, 4 + open, 0, 5 + open); ctx.quadraticCurveTo(-mw + 1, 4 + open, -mw, 3);
+    ctx.closePath(); blob(ctx, hit ? '#ddd' : '#3a0f12', 2.2);
+    ctx.fillStyle = bone;
+    const n = maw ? 7 : 5;
+    for (let i = 0; i < n; i++) {
+      const x = -mw + 2 + i * ((mw * 2 - 4) / (n - 1)), fang = i === 1 || i === n - 2;
+      ctx.beginPath(); ctx.moveTo(x - 1.6, 3); ctx.lineTo(x, 3 + (fang ? 5 : 3)); ctx.lineTo(x + 1.6, 3); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - 1.4, 5 + open); ctx.lineTo(x, 5 + open - (fang ? 5 : 2.6)); ctx.lineTo(x + 1.4, 5 + open); ctx.fill();
+    }
+    if (ice && maw) { ctx.fillStyle = W('#dff8ff'); for (const x of [-8, 0, 8]) { ctx.beginPath(); ctx.moveTo(x - 2, 6 + open); ctx.lineTo(x, 13 + open); ctx.lineTo(x + 2, 6 + open); ctx.fill(); } }
+    if (!hit && (L.extra.includes('drip') || maw)) {
+      const dr = (t * 1.2) % 1;
+      ctx.fillStyle = fire ? 'rgba(255,150,40,.9)' : L.extra.includes('drip') && L.growth === 'pustules' ? 'rgba(40,40,50,.85)' : 'rgba(170,220,120,.85)';
+      ctx.beginPath(); ctx.ellipse(5, 7 + open + dr * 7, 1.6, 2.2 + dr * 2, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Headgear
+  const hair = W('#2a2220');
+  if (L.head === 'longhair') {
+    ctx.fillStyle = W(ice ? '#e8eef2' : '#3a2a22');
+    ctx.beginPath(); ctx.moveTo(-15, -6); ctx.quadraticCurveTo(-16, -24, 0, -23); ctx.quadraticCurveTo(16, -24, 15, -6);
+    for (const [x, y] of [[11, -12], [7, -8], [3, -13], [-2, -9], [-6, -13], [-10, -8]]) ctx.lineTo(x, y);
+    ctx.closePath(); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+  } else if (L.head === 'hair') {
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.moveTo(-15, -10);
+    for (const [x, y] of [[-16, -22], [-9, -17], [-6, -26], [0, -18], [5, -27], [8, -18], [14, -24], [15, -10]]) ctx.lineTo(x, y);
+    ctx.quadraticCurveTo(0, -16, -15, -10); ctx.fill();
+  } else if (L.head === 'mohawk') {
+    const mc = W(color === '#c08ae8' ? '#ff4df0' : fire ? '#ff6a1a' : '#e0303a');
+    ctx.beginPath(); ctx.moveTo(-4, -17);
+    for (let i = 0; i < 6; i++) { ctx.lineTo(-4 + i * 1.6, -30 - (i % 2) * 6); ctx.lineTo(-3 + i * 1.6, -19); }
+    ctx.lineTo(5, -17); ctx.closePath(); blob(ctx, mc, 2);
+  } else if (L.head === 'bald') {
+    ctx.strokeStyle = W('#4a1a1a'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-10, -16); ctx.lineTo(4, -20); ctx.stroke();
+    for (let i = 0; i < 4; i++) { const x = -8 + i * 3.8; ctx.beginPath(); ctx.moveTo(x, -20); ctx.lineTo(x + 1, -15); ctx.stroke(); }
+  } else if (L.head === 'horns') {
+    for (const s of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(s * 9, -16); ctx.quadraticCurveTo(s * 26, -18, s * 24, -36); ctx.quadraticCurveTo(s * 18, -24, s * 5, -20); ctx.closePath();
+      blob(ctx, fire ? W('#2a2028') : ice ? W('#dff8ff') : bone, 2.2);
+    }
+  } else if (L.head === 'tophat') {
+    rr(ctx, -12, -44, 24, 26, 3); blob(ctx, W('#1b1f2a'), 2.4);
+    ctx.fillStyle = W('#c0303a'); ctx.fillRect(-12, -24, 24, 4);
+    ctx.beginPath(); ctx.ellipse(0, -18, 20, 4, 0, 0, Math.PI * 2); blob(ctx, W('#1b1f2a'), 2.4);
+  } else if (L.head === 'cowboy') {
+    ctx.beginPath(); ctx.ellipse(0, -16, 26, 6, 0, 0, Math.PI * 2); blob(ctx, W('#8a5530'), 2.4);
+    ctx.beginPath(); ctx.moveTo(-12, -16); ctx.quadraticCurveTo(-12, -34, 0, -30); ctx.quadraticCurveTo(12, -34, 12, -16); ctx.closePath(); blob(ctx, W('#9a6538'), 2.4);
+    ctx.fillStyle = W('#3a2a1a'); ctx.fillRect(-12, -20, 24, 3);
+  } else if (L.head === 'bandana') {
+    ctx.fillStyle = W(L.extra.includes('apron') ? '#e6e0d0' : '#c0303a');
+    ctx.beginPath(); ctx.moveTo(-15, 1); ctx.quadraticCurveTo(0, -2, 15, 1); ctx.lineTo(10, 16); ctx.lineTo(0, 20); ctx.lineTo(-10, 16); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.moveTo(-14, -12); ctx.quadraticCurveTo(0, -26, 14, -12); ctx.quadraticCurveTo(0, -18, -14, -12); ctx.fill();
+  } else if (L.head === 'hood') {
+    const hc = W(fire ? '#5a1414' : '#5a4a3a');
+    ctx.beginPath(); ctx.moveTo(-20, 14); ctx.quadraticCurveTo(-24, -30, 0, -30); ctx.quadraticCurveTo(24, -30, 20, 14); ctx.lineTo(14, 12); ctx.quadraticCurveTo(16, -18, 0, -19); ctx.quadraticCurveTo(-16, -18, -14, 12); ctx.closePath();
+    blob(ctx, hc, 2.4);
+  } else if (L.head === 'gasmask' || L.head === 'plague') {
+    const plague = L.head === 'plague';
+    ctx.beginPath(); ctx.ellipse(0, -1, 15, 13, 0, 0, Math.PI * 2); blob(ctx, W(plague ? '#2a2420' : '#3f4a3a'), 2.4);
+    for (const s of [-1, 1]) {
+      ctx.beginPath(); ctx.arc(s * 6.5, -5, 4.6, 0, Math.PI * 2); blob(ctx, W('#9aa3ad'), 2);
+      if (!hit) { const g = ctx.createRadialGradient(s * 6.5, -5, 0, s * 6.5, -5, 4); g.addColorStop(0, '#fff'); g.addColorStop(0.5, glowC); g.addColorStop(1, 'rgba(255,230,120,.4)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(s * 6.5, -5, 3.6, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (plague) {
+      // Long plague-doctor beak
+      ctx.beginPath(); ctx.moveTo(-5, 2); ctx.quadraticCurveTo(0, 26, 2, 30); ctx.quadraticCurveTo(6, 18, 5, 2); ctx.closePath(); blob(ctx, W('#3a302a'), 2.2);
+      ctx.beginPath(); ctx.ellipse(0, -16, 22, 5, 0, 0, Math.PI * 2); blob(ctx, W('#1b1f2a'), 2.2);
+      rr(ctx, -12, -30, 24, 14, 3); blob(ctx, W('#1b1f2a'), 2.2);
+    } else {
+      rr(ctx, -5, 3, 10, 10, 3); blob(ctx, W('#2a2d33'), 2);
+      ctx.fillStyle = W('#9aa3ad'); for (const y of [6, 9]) ctx.fillRect(-4, y, 8, 1.3);
+      ctx.fillStyle = hair; ctx.beginPath(); ctx.moveTo(-14, -12); ctx.quadraticCurveTo(0, -26, 14, -12); ctx.quadraticCurveTo(0, -17, -14, -12); ctx.fill();
+    }
+  } else if (L.head === 'helmet') {
+    const royal = L.extra.includes('cleaver') && L.extra.includes('cape') && !L.extra.includes('chains');
+    ctx.beginPath(); ctx.moveTo(-17, -2); ctx.quadraticCurveTo(-18, -26, 0, -27); ctx.quadraticCurveTo(18, -26, 17, -2); ctx.lineTo(9, -2); ctx.lineTo(9, -8); ctx.lineTo(-9, -8); ctx.lineTo(-9, -2); ctx.closePath();
+    blob(ctx, W(royal ? '#c9a44a' : '#6a7280'), 2.4);
+    if (royal) { ctx.fillStyle = W('#e0303a'); ctx.beginPath(); ctx.moveTo(-2, -27); ctx.quadraticCurveTo(0, -42, 8, -44); ctx.quadraticCurveTo(4, -34, 3, -27); ctx.fill(); }
+    else for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 13, -18); ctx.quadraticCurveTo(s * 30, -22, s * 28, -40); ctx.quadraticCurveTo(s * 22, -28, s * 10, -24); ctx.closePath(); blob(ctx, bone, 2.2); }
+  } else if (L.head === 'visor') {
+    rr(ctx, -16, -10, 32, 9, 4); blob(ctx, W('#1b1f2a'), 2.2);
+    if (!hit) {
+      const g = ctx.createLinearGradient(-15, 0, 15, 0);
+      g.addColorStop(0, '#2fe0ff'); g.addColorStop(0.5, '#ff4df0'); g.addColorStop(1, '#2fe0ff');
+      ctx.fillStyle = g; ctx.fillRect(-14, -8 + (Math.random() < 0.08 ? 1 : 0), 28, 4);
+    }
+    ctx.fillStyle = hair; ctx.beginPath(); ctx.moveTo(-14, -12); ctx.quadraticCurveTo(0, -26, 14, -12); ctx.quadraticCurveTo(0, -18, -14, -12); ctx.fill();
+  }
+
+  // Crowns for chapter bosses
+  if (L.crown === 'gold' || L.crown === 'junk' || L.crown === 'ice' || L.crown === 'fire') {
+    const cy = L.head === 'longhair' || L.head === 'bald' ? -18 : L.head === 'horns' ? -20 : -22;
+    if (L.crown === 'fire') {
+      for (let i = -2; i <= 2; i++) {
+        const fh = 12 + Math.sin(t * 9 + i) * 3 + (i === 0 ? 5 : 0);
+        ctx.fillStyle = hit ? '#fff' : i % 2 ? '#ffd23a' : '#ff6a1a';
+        ctx.beginPath(); ctx.moveTo(i * 5 - 4, cy); ctx.quadraticCurveTo(i * 5 - 3, cy - fh * 0.6, i * 5, cy - fh); ctx.quadraticCurveTo(i * 5 + 3, cy - fh * 0.6, i * 5 + 4, cy); ctx.fill();
+      }
+      rr(ctx, -13, cy - 3, 26, 6, 2); blob(ctx, W('#2a2028'), 2);
+    } else {
+      const cc = W(L.crown === 'ice' ? '#bfeefc' : L.crown === 'junk' ? '#8a939e' : '#ffc632');
+      ctx.beginPath(); ctx.moveTo(-13, cy);
+      const pts = L.crown === 'junk' ? [[-12, cy - 9], [-7, cy - 5], [-3, cy - 13], [2, cy - 6], [6, cy - 11], [10, cy - 4], [13, cy - 10]]
+        : [[-13, cy - 12], [-7, cy - 6], [0, cy - 15], [7, cy - 6], [13, cy - 12]];
+      for (const [x, y] of pts) ctx.lineTo(x, y);
+      ctx.lineTo(13, cy); ctx.closePath(); blob(ctx, cc, 2.4);
+      ctx.fillStyle = W(L.crown === 'ice' ? '#5fa0e8' : '#e0303a');
+      ctx.beginPath(); ctx.arc(0, cy - 4, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // Final bosses glow with power
+  if (final && !hit) {
+    ctx.globalAlpha = 0.25 + 0.1 * Math.sin(t * 4);
+    const g = ctx.createRadialGradient(0, -60, 10, 0, -60, 70);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.7, glowC); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -60, 70, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
 // ---------- Props ----------
 
 function drawBarrel(ctx, cx, footY, w, h, hp) {

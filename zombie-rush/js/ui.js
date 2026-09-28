@@ -188,7 +188,7 @@ const UI = (() => {
       <button class="btn battle-btn" id="battle-btn"><span class="tx">BATTLE!</span></button>`;
 
     const bp = $('#boss-portrait').getContext('2d');
-    drawZombie(bp, 64, 200, 170, 0, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.15, shirt: '#4a3f7a' });
+    drawBoss(bp, 64, 178, 118, 0, { color: lvl.boss.color, name: lvl.boss.name, final: lvl.boss.final, wide: 0.9 });
 
     $('#screen-play').querySelectorAll('.node').forEach(b => b.addEventListener('click', () => {
       const i = +b.dataset.level;
@@ -310,7 +310,7 @@ const UI = (() => {
       const w0 = 1 + f0 * 5, w1 = 1 + f1 * 5;
       c.beginPath(); c.moveTo(w / 2 - w0, y0); c.lineTo(w / 2 + w0, y0); c.lineTo(w / 2 + w1, y1); c.lineTo(w / 2 - w1, y1); c.fill();
     }
-    drawZombie(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, boss: true, final: lvl.boss.final, wide: 1.2, shirt: '#4a3f7a' });
+    drawBoss(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, name: lvl.boss.name, final: lvl.boss.final });
     const ch2 = selectedChapter > 0;
     walkers.forEach((z, i) => {
       const y = hz + (h - hz) * z.z * 0.55;
@@ -770,7 +770,7 @@ const UI = (() => {
       drawSoldierBack(c, w * 0.5, h * 0.99, 70, 0, 0, 'rifle');
     } else if (id === 'survival') {
       for (let i = 0; i < 9; i++) drawZombie(c, w * (0.1 + (i % 5) * 0.2 + (i > 4 ? 0.1 : 0)), h * (i > 4 ? 0.98 : 0.72), i > 4 ? 90 : 62, i * 0.7, { seed: i * 0.13, color: i === 2 ? '#e0763a' : undefined, spit: i === 2 });
-      drawZombie(c, w * 0.5, h * 0.6, 120, 0.3, { boss: true, color: '#7aa84a', shirt: '#4a4f66', wide: 1.2 });
+      drawBoss(c, w * 0.5, h * 0.62, 120, 0.3, { color: '#7aa84a', name: 'Sewer Hulk' });
     } else if (id === 'extraction') {
       c.fillStyle = 'rgba(40,45,60,.5)'; c.beginPath(); c.ellipse(w * 0.62, h * 0.85, 90, 26, 0, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#ffd23a'; c.lineWidth = 4; c.setLineDash([10, 6]); c.stroke(); c.setLineDash([]);
