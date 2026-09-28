@@ -110,7 +110,7 @@ const Game = (() => {
       x: 0, targetX: 0, dist: 0, speed: RUN_SPEED, t: 0,
       dmgMult: 1, rateMult: 1, shots: 1,
       weapon: equippedWeapon(), leaderCd: 0.2, trickle: 3,
-      squad: 6 + Math.max(0, 3 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
+      squad: 6 + Math.max(0, 4 - chIdx * 6 - lvlIdx) * 2, squadPeak: 6, cx: 0, slots: [], hw: 0, groups: {}, nextGid: 1,
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
@@ -188,8 +188,11 @@ const Game = (() => {
   const SPECIALS = [['spitter', 1], ['shocker', 1], ['hopper', 2], ['screamer', 3], ['digger', 4]];
   function zombieType() {
     const types = run.cfg.types.concat(SPECIALS.filter(([, from]) => run.gl >= from).map(([t]) => t));
-    let r = Math.random() * types.reduce((sum, t) => sum + TYPE_WEIGHT[t], 0);
-    for (const t of types) if ((r -= TYPE_WEIGHT[t]) < 0) return t;
+    // A special shows up less often on the level where it is first introduced.
+    const firstAt = Object.fromEntries(SPECIALS);
+    const wt = t => TYPE_WEIGHT[t] * (firstAt[t] === run.gl ? 0.4 : 1);
+    let r = Math.random() * types.reduce((sum, t) => sum + wt(t), 0);
+    for (const t of types) if ((r -= wt(t)) < 0) return t;
     return 'walker';
   }
 
@@ -276,7 +279,9 @@ const Game = (() => {
   }
 
   function spawnGate(z, supply = false) {
-    const a = gateOption(true);
+    let a = gateOption(true);
+    // Comeback: a squad that got whittled down always gets a soldier sign to rebuild with.
+    if (run.squad < 12) a = { type: 'squad', val: Math.round(rand(6, 9) + run.gl * 1.1) };
     let b = gateOption(supply || Math.random() < (run.gl < 2 ? 0.25 : 0.45));
     if (!supply && b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
