@@ -865,50 +865,96 @@ input[type=range]::-moz-range-thumb {
 
 /* ---------- Support calls (bottom corners) ---------- */
 .abilities {
-  position: absolute; bottom: calc(14px + var(--safe-b)); display: flex; gap: 8px;
+  position: absolute; bottom: calc(10px + var(--safe-b)); display: flex; gap: 8px; align-items: flex-end;
 }
-.abilities.left { left: 10px; }
-.abilities.right { right: 10px; }
+.abilities.left { left: 8px; }
+.abilities.right { right: 8px; }
 .ab-btn {
-  --p: 0;
+  --p: 0; --d: 0;
   pointer-events: auto; position: relative;
-  width: 60px; height: 60px; border-radius: 50%;
-  border: 3px solid var(--ink);
-  background: radial-gradient(circle at 50% 35%, #3d4a8f, #1c2257);
-  box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 3px 0 var(--ink);
-  display: grid; place-items: center; padding: 0;
-  transition: transform .1s;
+  width: 68px; height: 82px; padding: 0; border: 0; background: none;
+  -webkit-user-select: none; user-select: none;
 }
-.ab-btn:active { transform: scale(.92); }
-.ab-icon { display: grid; place-items: center; }
-.ab-icon svg { width: 40px; height: 40px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.4)); }
-/* Cooldown sweep: dark wedge shrinking clockwise */
-.ab-btn::before {
-  content: ''; position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(rgba(8,8,30,.72) calc(var(--p) * 360deg), transparent 0);
-  pointer-events: none;
+.ab-tile {
+  position: absolute; left: 0; top: 0; width: 68px; height: 68px; border-radius: 20px;
+  border: 3px solid var(--ink); overflow: hidden;
+  background: radial-gradient(circle at 50% 28%, var(--c-hi) 0%, var(--c) 52%, var(--c-lo) 100%);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 0 rgba(0,0,0,.28), 0 4px 0 var(--ink), 0 6px 10px rgba(0,0,0,.35);
+  transition: transform .12s;
 }
-.ab-cd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.35rem; z-index: 1; pointer-events: none; }
+.ab-tile::after { /* glossy top */
+  content: ''; position: absolute; left: 6px; right: 6px; top: 3px; height: 38%; border-radius: 14px 14px 40% 40%;
+  background: linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,0)); pointer-events: none; z-index: 3;
+}
+.ab-btn:active .ab-tile { transform: translateY(3px) scale(.95); box-shadow: inset 0 3px 0 rgba(255,255,255,.5), inset 0 -4px 0 rgba(0,0,0,.28), 0 1px 0 var(--ink); }
+.ab-art {
+  position: absolute; left: 4px; top: 3px; width: 56px; height: 56px; z-index: 1;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); transition: filter .3s;
+}
+.ab-cool { /* cooldown wedge, shrinking clockwise */
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: conic-gradient(rgba(10,10,35,.68) calc(var(--p) * 360deg), transparent 0);
+}
+.ab-cd {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; font-size: 1.7rem; pointer-events: none;
+  -webkit-text-stroke: 1.5px var(--ink); text-shadow: 0 3px 0 var(--ink);
+}
+.ab-sheen {
+  position: absolute; top: -20%; bottom: -20%; width: 34%; left: -60%; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); transform: skewX(-20deg); opacity: 0;
+}
+.ab-dur { /* remaining time of an active call */
+  position: absolute; left: 6px; right: 6px; bottom: 5px; height: 6px; z-index: 4; border-radius: 3px;
+  background: rgba(10,10,35,.6); overflow: hidden; opacity: 0;
+}
+.ab-dur i { display: block; height: 100%; width: calc(var(--d) * 100%); background: #fff; border-radius: 3px; }
 .ab-ad {
-  position: absolute; top: -7px; right: -7px; z-index: 2; width: 24px; height: 24px; border-radius: 50%;
-  background: #fff; border: 2.5px solid var(--ink); display: grid; place-items: center;
+  position: absolute; top: -8px; right: -8px; z-index: 6; width: 26px; height: 26px; border-radius: 50%;
+  background: linear-gradient(#fff, #dfe6f5); border: 2.5px solid var(--ink); display: grid; place-items: center;
+  box-shadow: 0 2px 0 var(--ink);
 }
-.ab-ad svg { width: 16px; height: 16px; }
-.ab-name {
-  position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); z-index: 2;
-  font-size: .62rem; white-space: nowrap; padding: 0 5px 1px; border-radius: 6px;
-  background: var(--ink); color: #fff;
+.ab-ad svg { width: 17px; height: 17px; }
+.ab-foot {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 5;
+  font-size: .7rem; white-space: nowrap; padding: 1px 8px 2px; border-radius: 8px;
+  background: var(--ink); color: #cfd4ff; border: 2px solid rgba(255,255,255,.25);
 }
-.ab-btn.ready {
+.ab-foot .on { display: none; }
+/* Cooling down: dull art */
+.ab-btn:not(.ready):not(.active) .ab-art { filter: grayscale(.85) brightness(.75) drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+.ab-btn:not(.ready):not(.active) .ab-tile { background: radial-gradient(circle at 50% 28%, #6c7399, #3b4170 60%, #262a4f); }
+/* Ready: glowing, bouncing, shiny */
+.ab-btn.ready .ab-tile {
   border-color: #fff;
-  box-shadow: inset 0 -4px 0 rgba(0,0,0,.35), 0 3px 0 var(--ink), 0 0 0 3px var(--c), 0 0 18px 4px var(--c);
-  animation: ab-glow 1.2s ease-in-out infinite;
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 0 rgba(0,0,0,.28), 0 4px 0 var(--ink), 0 0 0 3px var(--ink), 0 0 20px 6px var(--c);
+  animation: ab-bounce 1.6s ease-in-out infinite;
 }
-.ab-btn.active .ab-icon { animation: ab-bob .5s ease-in-out infinite alternate; }
-.ab-btn.nope { animation: ab-nope .3s; }
-@keyframes ab-glow { 50% { transform: scale(1.07); } }
-@keyframes ab-bob { to { transform: translateY(-3px); } }
-@keyframes ab-nope { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.ab-btn.ready .ab-sheen { animation: ab-sheen 2.2s ease-in-out infinite; }
+.ab-btn.ready .ab-foot { background: linear-gradient(#5fe04f, #2fa82a); color: #fff; border-color: var(--ink); box-shadow: 0 2px 0 var(--ink); }
+.ab-btn.ready .ab-foot .off { display: none; }
+.ab-btn.ready .ab-foot .on { display: inline; }
+.ab-btn.ready .ab-ad { animation: ab-wiggle 1.6s ease-in-out infinite; }
+/* Active: duration bar, pulsing ring */
+.ab-btn.active .ab-dur { opacity: 1; }
+.ab-btn.active .ab-tile { border-color: var(--c-hi); animation: ab-pulse .6s ease-in-out infinite alternate; }
+.ab-btn.active .ab-art { animation: ab-bob .45s ease-in-out infinite alternate; }
+.ab-btn.active .ab-ad { display: none; }
+/* Just became ready */
+.ab-btn.pop .ab-tile { animation: ab-pop .5s cubic-bezier(.3, 1.8, .5, 1); }
+.ab-btn.pop::after {
+  content: 'READY!'; position: absolute; left: 50%; top: -18px; transform: translateX(-50%); z-index: 7;
+  font-family: var(--font); font-size: .85rem; color: #fff; -webkit-text-stroke: 1px var(--ink); text-shadow: 0 2px 0 var(--ink);
+  animation: ab-float .9s ease-out forwards; pointer-events: none;
+}
+.ab-btn.nope .ab-tile { animation: ab-nope .3s; }
+@keyframes ab-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes ab-sheen { 0% { left: -60%; opacity: 0; } 10% { opacity: 1; } 45%, 100% { left: 130%; opacity: 0; } }
+@keyframes ab-wiggle { 0%, 70%, 100% { transform: rotate(0); } 80% { transform: rotate(-14deg); } 90% { transform: rotate(14deg); } }
+@keyframes ab-pulse { to { box-shadow: inset 0 3px 0 rgba(255,255,255,.5), inset 0 -7px 0 rgba(0,0,0,.28), 0 4px 0 var(--ink), 0 0 16px 4px var(--c); } }
+@keyframes ab-bob { to { transform: translateY(-3px) scale(1.04); } }
+@keyframes ab-pop { 0% { transform: scale(.7); } 100% { transform: scale(1); } }
+@keyframes ab-float { from { opacity: 1; transform: translate(-50%, 6px); } to { opacity: 0; transform: translate(-50%, -14px); } }
+@keyframes ab-nope { 25% { transform: translateX(-5px) rotate(-4deg); } 75% { transform: translateX(5px) rotate(4deg); } }
 
 /* ---------- Rewarded ad ---------- */
 .ad-view {

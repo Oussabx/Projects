@@ -588,13 +588,21 @@ const Game = (() => {
     const P = supportPower();
     if (id === 'air') {
       r.jet = { t: 0, dur: 1.5 };
-      const targets = LANES.slice().sort(() => Math.random() - 0.5).slice(0, 4).map((x, i) => ({ x, z: rand(4, 12) }));
-      if (r.boss && r.boss.hp > 0) targets[0] = { x: r.boss.x, z: r.boss.z };
-      else {
-        const near = r.zombies.filter(z => z.z > 2 && z.z < 14 && !z.burrowed).sort((a, b) => a.z - b.z);
-        near.slice(0, 3).forEach((z, i) => { targets[i] = { x: z.x, z: z.z - z.speed * 0.5 }; });
+      // Each bomb locks onto a zombie and follows it until impact: biggest threats first, then the closest.
+      const live = r.zombies.filter(z => !z.burrowed && z.z > 0.8 && z.z < 18);
+      const threat = z => (z.mini ? 100 : 0) + (z.spit || z.zap ? 8 : 0) - z.z;
+      const picks = live.sort((a, b) => threat(b) - threat(a));
+      const targets = [];
+      if (r.boss && r.boss.hp > 0 && r.boss.z < 18) targets.push(r.boss, r.boss);
+      for (const z of picks) {
+        if (targets.length >= 4) break;
+        // Skip zombies another bomb will already catch in its blast.
+        if (targets.some(t => t !== r.boss && Math.hypot(t.x - z.x, (t.z - z.z) * 0.6) < 0.3)) continue;
+        targets.push(z);
       }
-      targets.forEach((tg, i) => r.strikes.push({ x: tg.x, z: tg.z, t: 0.7 + i * 0.18, max: 0.7 + i * 0.18, m: P * 1.8 }));
+      for (let i = 0; targets.length < 4 && picks.length; i++) targets.push(picks[i % picks.length]);
+      while (targets.length < 4) targets.push({ x: pick(LANES), z: rand(5, 11), ghost: true });
+      targets.forEach((tg, i) => r.strikes.push({ target: tg.ghost ? null : tg, x: tg.x, z: tg.z, t: 0.6 + i * 0.16, max: 0.6 + i * 0.16, m: P * 1.8 }));
       Sound.play('warn');
       showBanner('AIRSTRIKE INCOMING', 1.2, 'good');
     } else if (id === 'tank') {
@@ -650,7 +658,8 @@ const Game = (() => {
     if (r.jet) { r.jet.t += dt; if (r.jet.t > r.jet.dur) r.jet = null; }
     for (let i = r.strikes.length - 1; i >= 0; i--) {
       const s = r.strikes[i];
-      s.z -= move;
+      const tg = s.target;
+      if (tg && (tg === r.boss ? tg.hp > 0 : r.zombies.includes(tg))) { s.x = tg.x; s.z = tg.z; } else { s.target = null; s.z -= move; }
       if ((s.t -= dt) <= 0) { blast(s.x, s.z, 0.42, s.m); r.strikes.splice(i, 1); }
     }
 
@@ -1326,6 +1335,21 @@ const Game = (() => {
       drawRock(ctx, p.x, p.y - arc, 0.14 * roadW * p.s + 4, r.t);
     }
 
+    // Airstrike bombs dropping onto their targets
+    for (const s of r.strikes) {
+      if (s.t > 0.45) continue;
+      const p = proj(s.x, s.z), k = s.t / 0.45;
+      const bs = Math.max(7, 0.13 * roadW * p.s);
+      const by = p.y - 0.2 * roadW * p.s - k * H * 0.45;
+      ctx.save(); ctx.translate(p.x + k * 30, by); ctx.rotate(0.25 * k);
+      ctx.fillStyle = '#2d3340'; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 0, bs * 0.45, bs, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e0242c'; ctx.fillRect(-bs * 0.45, -bs * 0.25, bs * 0.9, bs * 0.18);
+      ctx.fillStyle = '#5b6672';
+      ctx.beginPath(); ctx.moveTo(-bs * 0.5, -bs * 1.25); ctx.lineTo(bs * 0.5, -bs * 1.25); ctx.lineTo(bs * 0.25, -bs * 0.7); ctx.lineTo(-bs * 0.25, -bs * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
     // Support aircraft fly above everything on the road.
     if (r.heli) {
       const hl = r.heli, p = proj(hl.x, hl.z);
@@ -1655,18 +1679,28 @@ const Game = (() => {
     const html = chips.join('');
     if (html !== lastBuffs) { hud.buffs.innerHTML = html; lastBuffs = html; }
 
-    // Support buttons: cooldown sweep + seconds left, glow when ready.
+    // Support buttons: cooldown sweep, "READY!" pop, and a duration bar while a call is active.
     for (const a of ABILITIES) {
       const el = abBtns[a.id] || (abBtns[a.id] = document.querySelector(`.ab-btn[data-ab="${a.id}"]`));
       if (!el) continue;
       const left = r.abCd[a.id], ready = abilityReady(a.id);
-      const busy = (a.id === 'tank' && r.tank) || (a.id === 'heli' && r.heli) || (a.id === 'freeze' && r.frozen > 0);
-      const p = busy ? 1 : left / a.cd;
-      const txt = busy ? '' : left > 0 ? String(Math.ceil(left)) : '';
+      const active = a.id === 'tank' ? r.tank && r.tank.t < r.tank.dur && 1 - r.tank.t / r.tank.dur
+        : a.id === 'heli' ? r.heli && r.heli.t < r.heli.dur && 1 - r.heli.t / r.heli.dur
+        : a.id === 'freeze' ? r.frozen > 0 && r.frozen / 4
+        : r.strikes.length || r.jet ? 1 : 0;
+      const busy = !!active || (a.id === 'tank' && !!r.tank) || (a.id === 'heli' && !!r.heli);
+      const p = busy ? 0 : left / a.cd;
+      const txt = busy || left <= 0 ? '' : String(Math.ceil(left));
       if (el._p !== p.toFixed(3)) { el._p = p.toFixed(3); el.style.setProperty('--p', el._p); }
+      if (active) el.style.setProperty('--d', active.toFixed(3));
       if (el._txt !== txt) { el._txt = txt; el.querySelector('.ab-cd').textContent = txt; }
+      if (ready && el._ready === false) {
+        el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+        clearTimeout(el._popT); el._popT = setTimeout(() => el.classList.remove('pop'), 900);
+      }
+      el._ready = ready;
       el.classList.toggle('ready', ready);
-      el.classList.toggle('active', !!busy);
+      el.classList.toggle('active', !!active);
     }
   }
   const abBtns = {};

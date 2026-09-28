@@ -1077,7 +1077,7 @@ function drawTank(ctx, x, footY, s, t, recoil = 0) {
 }
 
 // Helicopter seen from behind and above, rotor spinning.
-function drawHeli(ctx, x, y, s, t, firing) {
+function drawHeli(ctx, x, y, s, t, firing, still = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.lineJoin = 'round';
@@ -1105,14 +1105,18 @@ function drawHeli(ctx, x, y, s, t, firing) {
     }
   }
   // Rotor blur + blades
-  ctx.fillStyle = 'rgba(40,40,60,.18)';
-  ctx.beginPath(); ctx.ellipse(0, -s * 0.05, s * 0.75, s * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+  if (!still) {
+    ctx.fillStyle = 'rgba(40,40,60,.18)';
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.05, s * 0.75, s * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.strokeStyle = 'rgba(30,30,45,.85)';
   ctx.lineWidth = Math.max(2, s * 0.06);
   ctx.lineCap = 'round';
   for (let k = 0; k < 2; k++) {
     const a = t * 30 + k * Math.PI / 2;
-    ctx.beginPath(); ctx.moveTo(Math.cos(a) * s * 0.72, -s * 0.05 + Math.sin(a) * s * 0.72); ctx.lineTo(-Math.cos(a) * s * 0.72, -s * 0.05 - Math.sin(a) * s * 0.72); ctx.stroke();
+    const bl = s * (still ? 0.62 : 0.72);
+    if (still) { ctx.strokeStyle = INK; ctx.lineWidth = s * 0.1; ctx.beginPath(); ctx.moveTo(Math.cos(a) * bl, -s * 0.05 + Math.sin(a) * bl); ctx.lineTo(-Math.cos(a) * bl, -s * 0.05 - Math.sin(a) * bl); ctx.stroke(); ctx.strokeStyle = '#8a93a6'; ctx.lineWidth = s * 0.05; }
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * bl, -s * 0.05 + Math.sin(a) * bl); ctx.lineTo(-Math.cos(a) * bl, -s * 0.05 - Math.sin(a) * bl); ctx.stroke();
   }
   ctx.fillStyle = INK;
   ctx.beginPath(); ctx.arc(0, -s * 0.05, s * 0.05, 0, Math.PI * 2); ctx.fill();

@@ -730,10 +730,56 @@ const UI = (() => {
 
   let adOpen = false;
 
+  // Button art is rendered once from the same drawings used in the level.
+  function abilityArt(id) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 160;
+    const g = c.getContext('2d');
+    if (id === 'air') { g.translate(80, 84); g.rotate(-0.55); drawJet(g, 0, 0, 132, 0.3); }
+    else if (id === 'tank') drawTank(g, 80, 132, 128, 0.2, 0);
+    else if (id === 'heli') {
+      // Side-view gunship
+      g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = '#14132b'; g.lineWidth = 6;
+      g.fillStyle = '#3d5a80';
+      g.beginPath(); g.moveTo(92, 70); g.lineTo(150, 62); g.lineTo(150, 76); g.lineTo(96, 92); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#4f76a8'; g.beginPath(); g.ellipse(143, 56, 7, 16, 0.3, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#4f76a8';
+      g.beginPath(); g.moveTo(22, 88); g.bezierCurveTo(20, 56, 52, 46, 82, 50); g.bezierCurveTo(108, 52, 114, 74, 108, 96); g.bezierCurveTo(90, 112, 40, 112, 22, 88); g.fill(); g.stroke();
+      g.fillStyle = '#8fd2ff'; g.beginPath(); g.moveTo(28, 82); g.bezierCurveTo(28, 64, 44, 58, 58, 58); g.lineTo(58, 84); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#2a2f3a'; g.fillRect(34, 98, 30, 10); g.strokeRect(34, 98, 30, 10);
+      g.beginPath(); g.moveTo(40, 108); g.lineTo(36, 124); g.moveTo(92, 104); g.lineTo(96, 124); g.moveTo(22, 124); g.lineTo(112, 124); g.stroke();
+      g.fillStyle = '#2a2f3a'; g.fillRect(60, 36, 16, 14); g.strokeRect(60, 36, 16, 14);
+      g.lineWidth = 12; g.beginPath(); g.moveTo(6, 34); g.lineTo(130, 34); g.stroke();
+      g.strokeStyle = '#8a93a6'; g.lineWidth = 5; g.beginPath(); g.moveTo(9, 34); g.lineTo(127, 34); g.stroke();
+    }
+    else {
+      // Ice crystal
+      g.translate(80, 80);
+      g.lineCap = 'round';
+      for (const [w, col] of [[20, '#14132b'], [11, '#bff0ff'], [4, '#ffffff']]) {
+        g.strokeStyle = col; g.lineWidth = w;
+        for (let k = 0; k < 6; k++) {
+          g.save(); g.rotate(k * Math.PI / 3);
+          g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -62);
+          g.moveTo(0, -30); g.lineTo(-16, -44); g.moveTo(0, -30); g.lineTo(16, -44);
+          g.moveTo(0, -48); g.lineTo(-10, -58); g.moveTo(0, -48); g.lineTo(10, -58);
+          g.stroke(); g.restore();
+        }
+      }
+      g.fillStyle = '#fff'; g.strokeStyle = '#14132b'; g.lineWidth = 5;
+      g.beginPath();
+      for (let k = 0; k < 6; k++) g.lineTo(Math.cos(k * Math.PI / 3) * 15, Math.sin(k * Math.PI / 3) * 15);
+      g.closePath(); g.fill(); g.stroke();
+    }
+    return c.toDataURL();
+  }
+
   function buildAbilities() {
-    const btn = a => `<button class="ab-btn" data-ab="${a.id}" style="--c:${a.color}" aria-label="${a.name}, watch an ad to use">
-      <span class="ab-icon">${icon(a.icon, a.color, 40)}</span><span class="ab-cd tx"></span>
-      <span class="ab-ad">${icon('ad', '', 18)}</span><span class="ab-name tx">${a.name}</span></button>`;
+    const btn = a => `<button class="ab-btn" data-ab="${a.id}" style="--c:${a.color};--c-hi:${shadeHex(a.color, 0.45)};--c-lo:${shadeHex(a.color, -0.45)}" aria-label="${a.name}, watch an ad to use">
+      <span class="ab-tile"><img class="ab-art" src="${abilityArt(a.id)}" alt=""><span class="ab-cool"></span><span class="ab-sheen"></span>
+        <span class="ab-cd tx"></span><span class="ab-dur"><i></i></span></span>
+      <span class="ab-ad">${icon('ad', '', 18)}</span>
+      <span class="ab-foot tx"><span class="off">${a.short || a.name}</span><span class="on">▶ ${a.short || a.name}</span></span></button>`;
     $('#ab-left').innerHTML = ABILITIES.slice(0, 2).map(btn).join('');
     $('#ab-right').innerHTML = ABILITIES.slice(2).map(btn).join('');
     document.querySelectorAll('.ab-btn').forEach(b => b.addEventListener('click', () => requestAbility(b.dataset.ab)));
