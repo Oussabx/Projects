@@ -198,7 +198,7 @@ function shadeHex(hex, amt) {
 // Cartoon zombie facing the camera, feet at (cx, footY), ~100 units tall.
 function drawZombie(ctx, cx, footY, height, t, opts) {
   const { color = '#8fbf5a', flash = 0, wide = 1, boss = false, final = false, shirt = '#6b6f9a',
-    helmet = false, bomb = false, seed = 0, fat = false, spit = false, scream = false, dig = false, hop = false } = opts || {};
+    helmet = false, bomb = false, seed = 0, fat = false, spit = false, scream = false, dig = false, hop = false, zap = false, charging = false } = opts || {};
   const hit = flash > 0;
   const skin = hit ? '#ffffff' : color;
   const skinDk = hit ? '#e8e8e8' : shadeHex(color, -0.3);
@@ -419,6 +419,22 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
   }
   if (spit && !hit) {
     ctx.fillStyle = 'rgba(255,150,40,.85)'; ctx.beginPath(); ctx.ellipse(0, 13, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  if (zap) {
+    // Tesla-coil antennas with sparking tips
+    for (const s2 of [-1, 1]) {
+      ctx.strokeStyle = INK; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(s2 * 8, -20); ctx.lineTo(s2 * 14, -38); ctx.stroke();
+      ctx.beginPath(); ctx.arc(s2 * 14, -40, 4.5, 0, Math.PI * 2); blob(ctx, hit ? '#fff' : '#bfefff', 2);
+    }
+    if (!hit) {
+      ctx.strokeStyle = charging ? '#ffffff' : '#8fe8ff'; ctx.lineWidth = charging ? 3 : 2;
+      const j = () => (Math.random() - 0.5) * 8;
+      ctx.beginPath(); ctx.moveTo(-14, -40);
+      for (let i = 1; i <= 4; i++) ctx.lineTo(-14 + i * 7, -40 + j());
+      ctx.stroke();
+      if (charging) { ctx.fillStyle = 'rgba(190,240,255,.35)'; ctx.beginPath(); ctx.arc(0, -8, 32, 0, Math.PI * 2); ctx.fill(); }
+    }
   }
   if (hop) {
     ctx.fillStyle = hit ? '#fff' : '#e0303a';

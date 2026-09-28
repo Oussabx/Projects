@@ -265,6 +265,7 @@ const ZOMBIE_TYPES = {
   hopper:   { hpMult: 0.8, speed: 1.8, size: 0.85, color: '#a878e0', score: 15, hop: true },       // the only one that changes lanes
   screamer: { hpMult: 1.3, speed: 1.2, size: 0.95, color: '#e2dcc4', score: 20, scream: true },    // speeds up its lane
   digger:   { hpMult: 1.4, speed: 2.2, size: 1,    color: '#9a8a55', score: 20, dig: true },       // tunnels underground, can't be shot
+  shocker:  { hpMult: 1.2, speed: 1.0, size: 1,    color: '#6ec8f0', score: 20, zap: true },       // charges, then lightning strikes its lane
   brute:    { hpMult: 26,  speed: 0.8, size: 1.9,  color: '#7aa84a', score: 150, mini: true, contact: 8 }, // Fat Brute miniboss
 };
 

@@ -8,8 +8,8 @@ const Game = (() => {
   const BULLET_SPEED = 22;
   const RANGE = 13;
   const BOSS_HP_MULT = 4.5;
-  const BOSS_MARCH = 0.3;    // units/s once the boss is in range
-  const BOSS_ENRAGE = 10;    // seconds before it throws twice as often        // bullets fade out here, so fights happen mid-screen
+  const BOSS_MARCH = 0.22;   // units/s once the boss is in range
+  const BOSS_ENRAGE = 15;    // seconds before it throws twice as often        // bullets fade out here, so fights happen mid-screen
   const RUN_SPEED = 1.2;      // you creep forward slowly; zombies shamble toward you
   const LANES = [-0.72, -0.36, 0, 0.36, 0.72];   // zombies walk straight down one of these
   const ZOMBIE_PACE = 0.3;    // zombies walk really slowly
@@ -112,7 +112,7 @@ const Game = (() => {
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
-      zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [], fireballs: [],
+      zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [], fireballs: [], bolts: [],
       nextSpawn: 9, nextGate: 14, nextProp: 0,
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
@@ -180,9 +180,9 @@ const Game = (() => {
     });
   }
 
-  const TYPE_WEIGHT = { walker: 5, runner: 2.2, tank: 1, armored: 2, bomber: 1.3, hopper: 1.3, spitter: 1.2, screamer: 0.8, digger: 1 };
+  const TYPE_WEIGHT = { walker: 5, runner: 2.2, tank: 1, armored: 2, bomber: 1.3, hopper: 1.3, spitter: 1.6, screamer: 0.8, digger: 1, shocker: 1.4 };
   // Special zombies join the mix as you progress (overall level number).
-  const SPECIALS = [['hopper', 2], ['spitter', 3], ['screamer', 4], ['digger', 5]];
+  const SPECIALS = [['spitter', 1], ['shocker', 1], ['hopper', 2], ['screamer', 3], ['digger', 4]];
   function zombieType() {
     const types = run.cfg.types.concat(SPECIALS.filter(([, from]) => run.gl >= from).map(([t]) => t));
     let r = Math.random() * types.reduce((sum, t) => sum + TYPE_WEIGHT[t], 0);
@@ -192,7 +192,7 @@ const Game = (() => {
 
   // Each chapter tints its zombies (icy, toxic, charred, neon...).
   const SKIN_SHIFT = { walker: 0, runner: 0.14, tank: -0.2, armored: 0.07, bomber: 0.2, brute: -0.12 };
-  const OWN_SKIN = { spitter: 1, hopper: 1, screamer: 1, digger: 1 };   // keep their signature colors
+  const OWN_SKIN = { spitter: 1, hopper: 1, screamer: 1, digger: 1, shocker: 1 };   // keep their signature colors
   function zombieSkin(type, zt) {
     const base = OWN_SKIN[type] ? null : run.theme.skin;
     return base ? shadeHex(base, SKIN_SHIFT[type] || 0) : zt.color;
@@ -206,7 +206,7 @@ const Game = (() => {
       type, x, z, hp, maxHp: hp, speed: fixedSpeed || zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
       color: zombieSkin(type, zt), score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
-      spit: !!zt.spit, hop: !!zt.hop, scream: !!zt.scream, dig: !!zt.dig, mini: !!zt.mini,
+      spit: !!zt.spit, hop: !!zt.hop, scream: !!zt.scream, dig: !!zt.dig, mini: !!zt.mini, zap: !!zt.zap, zapCd: rand(0.6, 1.5),
       burrowed: !!zt.dig, spitCd: rand(0.4, 1.2), hopCd: rand(1.2, 2.2), hopT: -1, hopFrom: x, hopTo: x, screamT: rand(0, 2),
     };
     if (zt.mini) { zb.name = 'FAT BRUTE'; zb.shirt = '#6b4a2b'; }
@@ -297,7 +297,7 @@ const Game = (() => {
     const b = run.cfg.boss;
     // Bosses are a damage check: they keep marching in, so you need the buffs you picked up on the road.
     // Gentler on the first two levels so new players can learn the buff picks.
-    const mult = run.gl === 0 ? 2.5 : run.gl === 1 ? 4 : 3.5 * (1 + Math.min(run.gl, 12) * 0.2);
+    const mult = run.gl === 0 ? 1.6 : run.gl === 1 ? 2.2 : 2.4 * (1 + Math.min(run.gl, 12) * 0.14);
     const hp = Math.round(b.hp * mult);
     run.boss = {
       ...b, x: 0, z: 24, hp, maxHp: hp, flash: 0, t: 0, stomp: 0,
@@ -595,6 +595,7 @@ const Game = (() => {
       r.zombies = [];
       r.rocks = [];
       r.fireballs = [];
+      r.bolts = [];
       r.state = 'ending';
       r.endTimer = 1.4;
       showBanner('BOSS DEFEATED', 1.4, 'good');
@@ -700,9 +701,17 @@ const Game = (() => {
       }
       // Spitters lob fireballs straight down their lane.
       if (z.spit && z.z < 24 && z.z > 2.5 && (z.spitCd -= dt) <= 0) {
-        z.spitCd = rand(2.6, 3.6);
+        z.spitCd = rand(1.8, 2.6);
         r.fireballs.push({ x: z.x, z: z.z - 0.4, sp: 4.2, t: 0 });
         Sound.play('throw');
+      }
+
+      // Shockers charge up, then lightning strikes straight down their lane (dodge it or kill them first).
+      if (z.zap && z.z < 22 && z.z > 2.5 && !z.bolt && (z.zapCd -= dt) <= 0) {
+        z.zapCd = rand(3, 4.2);
+        z.bolt = { x: z.x, z0: z.z, t: 0, charge: 1.0, owner: z, struck: false };
+        r.bolts.push(z.bolt);
+        Sound.play('warn');
       }
 
       if (!z.burrowed && z.z < 0.45 && z.z > -0.5 && contact(z.x, r.cfg.zdmg * z.contact, z.contact, (z.mini ? 0.22 : 0.08) * z.size)) {
@@ -712,6 +721,24 @@ const Game = (() => {
       } else if (z.z < -1.5) {
         r.zombies.splice(i, 1);
       }
+    }
+    // Lightning bolts
+    for (let i = r.bolts.length - 1; i >= 0; i--) {
+      const b = r.bolts[i];
+      b.t += dt;
+      const alive = r.zombies.includes(b.owner);
+      if (alive) b.z0 = b.owner.z;
+      if (!b.struck && !alive) { r.bolts.splice(i, 1); continue; }   // killed while charging: no strike
+      if (!b.struck && b.t >= b.charge) {
+        b.struck = true;
+        b.path = Array.from({ length: 9 }, () => rand(-0.06, 0.06));
+        contact(b.x, r.cfg.zdmg * 1.3, 2 + Math.floor(r.gl * 0.3), 0.1);
+        r.fx.push({ type: 'flash', t: 0.12, max: 0.12 });
+        burst(b.x, 0.3, '#bfefff', 14);
+        Sound.play('zap');
+        r.shake = Math.max(r.shake, 0.18);
+      }
+      if (b.t > b.charge + 0.3) { if (b.owner) b.owner.bolt = null; r.bolts.splice(i, 1); }
     }
     // Fireballs
     for (let i = r.fireballs.length - 1; i >= 0; i--) {
@@ -800,7 +827,7 @@ const Game = (() => {
         b.stomp = 0.6;
         r.shake = 0.35;
         Sound.play('thud');
-        if (r.squad > 0) loseSoldiers(Math.max(3, Math.ceil(r.squad * 0.25)), b.x, -0.6);
+        if (r.squad > 0) loseSoldiers(Math.max(2, Math.ceil(r.squad * 0.12)), b.x, -0.6);
         else hurtPlayer(b.dmg * 2.5);
       }
     }
@@ -1081,7 +1108,7 @@ const Game = (() => {
       }
     }
     for (const z of r.zombies) list.push({ z: z.z, fn: () => drawOneZombie(z) });
-    for (const f of r.fireballs) list.push({ z: f.z, fn: () => { const p = proj(f.x, f.z); drawFireball(ctx, p.x, p.y - 0.28 * roadW * p.s, Math.max(4, 0.09 * roadW * p.s), r.t + f.t); } });
+    for (const f of r.fireballs) list.push({ z: f.z, fn: () => { const p = proj(f.x, f.z); drawFireball(ctx, p.x, p.y - 0.28 * roadW * p.s, Math.max(6, 0.13 * roadW * p.s), r.t + f.t); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
@@ -1147,6 +1174,8 @@ const Game = (() => {
         ctx.fillStyle = f.color; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 1.5;
         ctx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h); ctx.strokeRect(-f.w / 2, -f.h / 2, f.w, f.h);
         ctx.restore();
+      } else if (f.type === 'flash') {
+        ctx.globalAlpha = a * 0.35; ctx.fillStyle = '#dff6ff'; ctx.fillRect(0, 0, W, H);
       } else if (f.type === 'scream') {
         const p = proj(f.x, f.z), k = 1 - a;
         ctx.globalAlpha = a * 0.8;
@@ -1164,6 +1193,39 @@ const Game = (() => {
       }
     }
     ctx.globalAlpha = 1;
+
+    // Lightning: flickering warning line while charging, bright bolt on strike
+    for (const b of r.bolts) {
+      const top = proj(b.x, b.z0), bot = proj(b.x, 0.2);
+      const y0 = top.y - 0.6 * roadW * top.s, y1 = bot.y - 0.1 * roadW * bot.s;
+      if (!b.struck) {
+        const k = b.t / b.charge;
+        ctx.globalAlpha = 0.6 + 0.4 * (Math.sin(r.t * 40) > 0 ? 1 : 0.3) * k;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(80,200,255,.45)'; ctx.lineWidth = 10 + k * 10;
+        ctx.beginPath(); ctx.moveTo(top.x, y0); ctx.lineTo(bot.x, y1); ctx.stroke();
+        ctx.strokeStyle = '#e8fbff'; ctx.lineWidth = 3 + k * 3; ctx.setLineDash([12, 10]);
+        ctx.beginPath(); ctx.moveTo(top.x, y0); ctx.lineTo(bot.x, y1); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = `rgba(120,220,255,${0.3 + 0.4 * k})`;
+        ctx.beginPath(); ctx.ellipse(bot.x, bot.y, 0.3 * XS * roadW * bot.s, 0.08 * roadW * bot.s, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        const a = 1 - (b.t - b.charge) / 0.3;
+        ctx.globalAlpha = Math.max(0, a);
+        for (const [wdt, col] of [[14, 'rgba(120,220,255,.5)'], [5, '#e8fbff']]) {
+          ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.lineJoin = 'round';
+          ctx.beginPath();
+          b.path.forEach((off, n) => {
+            const f = n / (b.path.length - 1);
+            const pt = proj(b.x + off, b.z0 * (1 - f) + 0.2 * f);
+            const yy = pt.y - (0.6 * (1 - f) + 0.1 * f) * roadW * pt.s;
+            n ? ctx.lineTo(pt.x, yy) : ctx.moveTo(pt.x, yy);
+          });
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
 
     // Floating numbers
     ctx.textAlign = 'center';
@@ -1228,7 +1290,7 @@ const Game = (() => {
       for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(p.x + k * h * 0.2, p.y - h * 1.05); ctx.lineTo(p.x + k * h * 0.2, p.y - h * 1.3); ctx.stroke(); }
     }
     drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
-      helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop });
+      helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop, zap: z.zap, charging: !!z.bolt && !z.bolt.struck });
     if (z.mini) {
       // Miniboss: big named health bar
       const w = 0.9 * roadW * p.s + 40, y = p.y - h * 1.18;

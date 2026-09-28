@@ -133,6 +133,7 @@ const Sound = (() => {
     chest:    () => { for (let i = 0; i < 5; i++) noise({ dur: 0.07, vol: 0.09, freq: jitter(700, 0.2), type: 'bandpass', q: 2, delay: i * 0.17 }); },
     reveal:   () => { [79, 83, 86, 91].forEach((n, i) => bell(n, { delay: i * 0.06, vol: 0.09, dur: 0.6, send: 0.45 })); noise({ dur: 0.7, vol: 0.03, freq: 7000, type: 'highpass', attack: 0.1 }); },
     upgrade:  () => [67, 74, 79].forEach((n, i) => bell(n, { delay: i * 0.07, vol: 0.1, dur: 0.3 })),
+    zap:      () => { noise({ dur: 0.35, vol: 0.2, freq: 5000, to: 800, type: 'bandpass', q: 1.2 }); voice({ freq: 1800, to: 120, dur: 0.3, vol: 0.08, type: 'square', cutoff: 3000 }); },
     equip:    () => { noise({ dur: 0.05, vol: 0.1, freq: 1500, type: 'bandpass', q: 1.5 }); bell(79, { delay: 0.04, vol: 0.08, dur: 0.2, send: 0.1 }); },
   };
 
