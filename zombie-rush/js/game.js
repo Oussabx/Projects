@@ -659,10 +659,10 @@ const Game = (() => {
         if (!sd || sd.broken || Math.abs(b.x) > 0.97) continue;
         if (sd.flipT > 0) { hit = true; break; }     // mid-flip: soaks bullets
         const { dmg } = bulletDamage(b.rocket ? b.m * 2 : b.m);
-        sd.hp -= dmg; sd.flash = 0.06;
+        sd.hp = Math.max(0, sd.hp - dmg); sd.flash = 0.06;
         shiftGate(sd);
         Sound.play('hit');
-        if (sd.hp <= 0) sd.val < 0 ? flipGate(gt, sd) : breakGate(gt, sd);
+        if (sd.hp <= 0 && sd.val < 0) flipGate(gt, sd);
         hit = true;
         break;
       }
@@ -1105,12 +1105,10 @@ const Game = (() => {
       g.z -= move;
       for (const sd of g.sides) { sd.flash = Math.max(0, sd.flash - 1 / 60); if (sd.flipT) sd.flipT = Math.max(0, sd.flipT - 1 / 60); }
       if (g.z <= 0.2) {
-        // Walking into a red sign still costs you; blue ones only pay out when shot to pieces.
+        // Signs never break: walk through one to get whatever it shows right now.
         const s = g.sides.find(s => s.side === (r.x < 0 ? -1 : 1));
-        if (s.val < 0) applyGate(s);
+        applyGate(s);
         r.gates.splice(i, 1);
-      } else if (g.sides.every(sd => sd.broken || sd.val < 0) && g.sides.some(sd => sd.broken)) {
-        if (g.sides.every(sd => sd.broken)) r.gates.splice(i, 1);
       }
     }
   }
@@ -1118,7 +1116,7 @@ const Game = (() => {
   // Shots visibly change a sign's number: red counts up toward zero, blue grows while it's shot open.
   const GROWS = { squad: 1, dmg: 1, rate: 1, heal: 1 };
   function shiftGate(sd) {
-    if (!GROWS[sd.type] || sd.hp <= 0) return;
+    if (!GROWS[sd.type] || (sd.base < 0 && sd.hp <= 0)) return;
     const f = clamp(1 - sd.hp / sd.maxHp, 0, 1);
     const v = sd.base < 0 ? Math.min(-1, Math.round(sd.base * (1 - f))) : Math.round(sd.base * (1 + 0.6 * f));
     if (v !== sd.val) { sd.val = v; sd.flash = 0.12; }
@@ -1140,19 +1138,6 @@ const Game = (() => {
     }
     addText(p.x, p.y - 0.7 * roadW * p.s, 'FLIPPED!', '#6fd3ff', 20, 0.9);
     Sound.play('gateGood');
-  }
-
-  function breakGate(gt, sd) {
-    const r = run;
-    sd.broken = true;
-    const x = sd.side * 0.5;
-    const p = proj(x, gt.z);
-    for (let k = 0; k < 18; k++) {
-      const a = rand(-Math.PI, 0), sp = rand(140, 360) * (0.5 + p.s * 0.5);
-      r.fx.push({ type: 'plank', sx: p.x + rand(-30, 30) * p.s, sy: p.y - 0.25 * roadW * p.s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, rot: rand(0, 6), vr: rand(-12, 12),
-        w: rand(8, 16) * (0.4 + p.s * 0.6), h: rand(6, 10) * (0.4 + p.s * 0.6), color: pick(['#7cc4ff', '#bfe3ff', '#3a8ff0']), t: 0.7, max: 0.7 });
-    }
-    applyGate(sd);
   }
 
   function applyGate(g) {
@@ -1842,7 +1827,7 @@ const Game = (() => {
       // Flip animation: the sign squashes and pops back as it turns blue.
       const fk = s.flipT ? Math.abs(Math.cos((1 - s.flipT / 0.5) * Math.PI)) : 1;
       const mid = (a.x + b.x) / 2, hw = (b.x - a.x) / 2 * Math.max(0.08, fk);
-      drawGate(ctx, mid - hw, mid + hw, a.y, h, gateLabel(s), s.flipT > 0.25 ? false : good, { frac: s.hp / s.maxHp, text: fmtN(Math.max(0, Math.ceil(s.hp))), flash: s.flash });
+      drawGate(ctx, mid - hw, mid + hw, a.y, h, gateLabel(s), s.flipT > 0.25 ? false : good, null);
       const cx = (a.x + b.x) / 2, topY = a.y - h - 0.08 * roadW * a.s, sz = 0.42 * roadW * a.s;
       if (s.type === 'drop') {
         if (s.drop === 'minigun' || s.drop === 'rocket') drawWeaponSide(ctx, s.drop, cx, topY - sz * 0.2, sz * 1.5, { rot: -0.15 });
