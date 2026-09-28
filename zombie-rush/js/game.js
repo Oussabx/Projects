@@ -7,7 +7,7 @@ const Game = (() => {
   const ROAD = 1;          // road half-width in world units
   const BULLET_SPEED = 22;
   const RANGE = 13;
-  const BOSS_HP_MULT = 6;
+  const BOSS_HP_MULT = 4.5;
   const BOSS_MARCH = 0.3;    // units/s once the boss is in range
   const BOSS_ENRAGE = 10;    // seconds before it throws twice as often        // bullets fade out here, so fights happen mid-screen
   const RUN_SPEED = 1.2;      // you creep forward slowly; zombies shamble toward you
@@ -112,7 +112,7 @@ const Game = (() => {
       combo: 0, comboT: 9, comboPop: 0,
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
-      zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [],
+      zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [], fireballs: [],
       nextSpawn: 9, nextGate: 14, nextProp: 0,
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
@@ -180,37 +180,59 @@ const Game = (() => {
     });
   }
 
-  const TYPE_WEIGHT = { walker: 5, runner: 2.2, tank: 1, armored: 2, bomber: 1.3 };
+  const TYPE_WEIGHT = { walker: 5, runner: 2.2, tank: 1, armored: 2, bomber: 1.3, hopper: 1.3, spitter: 1.2, screamer: 0.8, digger: 1 };
+  // Special zombies join the mix as you progress (overall level number).
+  const SPECIALS = [['hopper', 2], ['spitter', 3], ['screamer', 4], ['digger', 5]];
   function zombieType() {
-    const types = run.cfg.types;
+    const types = run.cfg.types.concat(SPECIALS.filter(([, from]) => run.gl >= from).map(([t]) => t));
     let r = Math.random() * types.reduce((sum, t) => sum + TYPE_WEIGHT[t], 0);
     for (const t of types) if ((r -= TYPE_WEIGHT[t]) < 0) return t;
     return 'walker';
   }
 
   // Each chapter tints its zombies (icy, toxic, charred, neon...).
-  const SKIN_SHIFT = { walker: 0, runner: 0.14, tank: -0.2, armored: 0.07, bomber: 0.2 };
+  const SKIN_SHIFT = { walker: 0, runner: 0.14, tank: -0.2, armored: 0.07, bomber: 0.2, brute: -0.12 };
+  const OWN_SKIN = { spitter: 1, hopper: 1, screamer: 1, digger: 1 };   // keep their signature colors
   function zombieSkin(type, zt) {
-    const base = run.theme.skin;
+    const base = OWN_SKIN[type] ? null : run.theme.skin;
     return base ? shadeHex(base, SKIN_SHIFT[type] || 0) : zt.color;
   }
 
-  function spawnZombie(x, z, type, gid = 0) {
+  function spawnZombie(x, z, type, gid = 0, fixedSpeed = 0) {
     const zt = ZOMBIE_TYPES[type];
     const hp = Math.round(run.cfg.zhp * zt.hpMult * 3);   // fewer, individual zombies, so each one is tougher
-    run.zombies.push({
+    const zb = {
       gid, acc: 0, accT: 0, seed: Math.random() * 10,
-      type, x, z, hp, maxHp: hp, speed: zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
+      type, x, z, hp, maxHp: hp, speed: fixedSpeed || zt.speed * ZOMBIE_PACE * rand(0.9, 1.1), size: zt.size,
       color: zombieSkin(type, zt), score: zt.score, flash: 0, t: Math.random() * 10, helmet: !!zt.helmet, bomb: !!zt.bomb, contact: zt.contact || (type === 'tank' ? 2 : 1),
       shirt: pick(['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff', '#ffb000', '#4fd645']),
-    });
+      spit: !!zt.spit, hop: !!zt.hop, scream: !!zt.scream, dig: !!zt.dig, mini: !!zt.mini,
+      burrowed: !!zt.dig, spitCd: rand(0.4, 1.2), hopCd: rand(1.2, 2.2), hopT: -1, hopFrom: x, hopTo: x, screamT: rand(0, 2),
+    };
+    if (zt.mini) { zb.name = 'FAT BRUTE'; zb.shirt = '#6b4a2b'; }
+    run.zombies.push(zb);
+    return zb;
   }
 
-  // One zombie at a time (sometimes two in different lanes), each walking straight down its lane.
+  // Usually one zombie at a time; sometimes a crowd in formation (every member walks at the same speed).
   function spawnSingle(z) {
+    const r = run;
+    if (Math.random() < (r.gl === 0 ? 0.12 : 0.22)) return spawnCrowd(z);
     const lanes = LANES.slice().sort(() => Math.random() - 0.5);
-    const n = run.gl >= 4 && Math.random() < 0.35 ? 2 : 1;
+    const n = r.gl >= 4 && Math.random() < 0.35 ? 2 : 1;
     for (let i = 0; i < n; i++) spawnZombie(lanes[i], z + rand(-0.3, 0.3), zombieType());
+  }
+
+  function spawnCrowd(z) {
+    const r = run;
+    const width = Math.min(5, 3 + Math.floor(Math.random() * (1 + Math.min(2, r.gl / 3))));
+    const rows = Math.min(3, 1 + Math.floor(Math.random() * (1 + r.gl / 4)));
+    const start = Math.floor(Math.random() * (LANES.length - width + 1));
+    const type = pick(r.gl >= 6 ? ['walker', 'walker', 'armored'] : ['walker']);
+    const speed = ZOMBIE_TYPES[type].speed * ZOMBIE_PACE;
+    for (let row = 0; row < rows; row++) {
+      for (let c = 0; c < width; c++) spawnZombie(LANES[start + c], z + row * 0.55, type, 0, speed);
+    }
   }
 
   // Barrels carry a reward on top: shoot the number to 0 to claim it.
@@ -250,10 +272,10 @@ const Game = (() => {
     ]);
   }
 
-  function spawnGate(z) {
+  function spawnGate(z, supply = false) {
     const a = gateOption(true);
-    let b = gateOption(Math.random() < (run.gl < 2 ? 0.25 : 0.45));
-    if (b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
+    let b = gateOption(supply || Math.random() < (run.gl < 2 ? 0.25 : 0.45));
+    if (!supply && b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     const hpFor = o => o.val >= 0 ? Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5 : 0;
     run.gates.push({ z, sides: [sides[0], sides[1]].map((o, i) => { const hp = hpFor(o); return { side: i ? 1 : -1, ...o, hp, maxHp: hp || 1, broken: false, flash: 0 }; }) });
@@ -275,7 +297,7 @@ const Game = (() => {
     const b = run.cfg.boss;
     // Bosses are a damage check: they keep marching in, so you need the buffs you picked up on the road.
     // Gentler on the first two levels so new players can learn the buff picks.
-    const mult = run.gl === 0 ? 2.5 : run.gl === 1 ? 4 : BOSS_HP_MULT * (1 + Math.min(run.gl, 12) * 0.06);
+    const mult = run.gl === 0 ? 2.5 : run.gl === 1 ? 4 : 3.5 * (1 + Math.min(run.gl, 12) * 0.2);
     const hp = Math.round(b.hp * mult);
     run.boss = {
       ...b, x: 0, z: 24, hp, maxHp: hp, flash: 0, t: 0, stomp: 0,
@@ -323,12 +345,24 @@ const Game = (() => {
     r.dist += move;
 
     if (!inBoss) {
-      while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len - 10) {
+      while (r.nextSpawn < r.dist + Z_FAR && r.nextSpawn < r.len + 6) {
         const z = r.nextSpawn - r.dist;
-        if (r.nextSpawn >= r.nextGate) { spawnGate(z); r.nextGate += rand(11, 15); }
-        else spawnSingle(z);
+        const supply = r.nextSpawn > r.len - 14 && !r.supplyDone;
+        if (r.nextSpawn >= r.nextGate || supply) {
+          spawnGate(z, supply);
+          if (supply) r.supplyDone = true;
+          r.nextGate += rand(8, 11);
+        } else spawnSingle(z);
         r.nextSpawn += rand(1.6, 2.6) / r.cfg.density;
       }
+      // Fat Brute miniboss halfway through (from level 2).
+      if (!r.miniDone && r.gl >= 1 && r.dist >= r.len * 0.45) {
+        r.miniDone = true;
+        spawnZombie(0, 20, 'brute');
+        showBanner('MINIBOSS: FAT BRUTE', 1.8, 'boss');
+      }
+      // Never let the road go quiet.
+      if (!r.zombies.some(zz => zz.z > 1.5 && zz.z < 24)) spawnSingle(rand(16, 22));
     } else if (!r.boss) {
       spawnBoss();
     }
@@ -473,7 +507,18 @@ const Game = (() => {
 
       if (!hit) {
         let target = null, bestZ = Infinity;
+        for (let fi = r.fireballs.length - 1; fi >= 0; fi--) {
+          const f = r.fireballs[fi];
+          if (Math.abs(f.x - b.x) < 0.13 && f.z > prevZ - 0.5 && f.z < b.z + 0.3) {
+            r.fireballs.splice(fi, 1);
+            burst(f.x, f.z, '#ffb02e', 10);
+            hit = true;
+            break;
+          }
+        }
+        if (hit) { r.bullets.splice(i, 1); continue; }
         for (const z of r.zombies) {
+          if (z.burrowed) continue;
           const rad = 0.15 * z.size + 0.05;
           if (Math.abs(z.x - b.x) < rad && z.z > prevZ - 0.6 && z.z < b.z + 0.3 && z.z < bestZ) { target = z; bestZ = z.z; }
         }
@@ -522,6 +567,15 @@ const Game = (() => {
     if (r.zombies.includes(t)) {
       r.zombies.splice(r.zombies.indexOf(t), 1);
       r.kills++;
+      if (t.mini) {
+        // The Fat Brute bursts into three walkers and drops reinforcements.
+        for (const dx of [-0.36, 0, 0.36]) spawnZombie(clamp(t.x + dx, -0.72, 0.72), t.z + 0.3, 'walker');
+        burst(t.x, t.z, '#9ad13b', 40); burst(t.x, t.z, t.color, 25);
+        Sound.play('explode'); r.shake = 0.4;
+        const gain = Math.round(8 + r.gl * 2);
+        addSquad(gain);
+        addText(W / 2, H * 0.42, `BRUTE DOWN! +${gain} SOLDIERS`, '#8fd2ff', 24, 1.4);
+      }
       r.combo++; r.comboT = 0; r.comboPop = 1;
       if (t.gid && r.groups[t.gid]) r.groups[t.gid].alive--;
       Sound.play('kill');
@@ -540,6 +594,7 @@ const Game = (() => {
       r.kills += r.zombies.length;
       r.zombies = [];
       r.rocks = [];
+      r.fireballs = [];
       r.state = 'ending';
       r.endTimer = 1.4;
       showBanner('BOSS DEFEATED', 1.4, 'good');
@@ -611,18 +666,63 @@ const Game = (() => {
 
   function updateZombies(dt, move) {
     const r = run;
+    // Screamers whip up every zombie in their lane nearby.
+    const screams = r.zombies.filter(z => z.scream && !z.burrowed);
     for (let i = r.zombies.length - 1; i >= 0; i--) {
       const z = r.zombies[i];
       z.t += dt;
       z.flash = Math.max(0, z.flash - dt);
-      z.z -= move + z.speed * dt;
-      if (z.z < 0.45 && z.z > -0.5 && contact(z.x, r.cfg.zdmg * z.contact, z.contact, 0.08 * z.size)) {
-        if (z.gid && r.groups[z.gid]) r.groups[z.gid].alive--;
-        burst(z.x, z.z, z.color, 8);
-        if (z.bomb) { burst(z.x, z.z, '#ffb02e', 20); Sound.play('explode'); r.shake = 0.35; }
+      z.hyped = !z.scream && screams.some(s => Math.abs(s.x - z.x) < 0.05 && Math.abs(s.z - z.z) < 5);
+      z.z -= move + z.speed * (z.hyped ? 1.9 : 1) * dt;
+
+      if (z.scream && (z.screamT -= dt) <= 0) {
+        z.screamT = 2.2;
+        r.fx.push({ type: 'scream', x: z.x, z: z.z, t: 0.8, max: 0.8 });
+      }
+      // Diggers tunnel up close before surfacing.
+      if (z.burrowed && z.z < 6) {
+        z.burrowed = false;
+        burst(z.x, z.z, '#8a6a42', 16);
+        Sound.play('thud');
+      }
+      // Hoppers leap to a neighbouring lane every couple of seconds.
+      if (z.hop) {
+        if (z.hopT >= 0) {
+          z.hopT += dt / 0.45;
+          z.x = z.hopFrom + (z.hopTo - z.hopFrom) * Math.min(1, z.hopT);
+          z.jump = Math.sin(Math.min(1, z.hopT) * Math.PI);
+          if (z.hopT >= 1) { z.hopT = -1; z.jump = 0; }
+        } else if ((z.hopCd -= dt) <= 0 && z.z > 1.5) {
+          const li = LANES.findIndex(l => Math.abs(l - z.x) < 0.05);
+          const opts = [li - 1, li + 1].filter(k => k >= 0 && k < LANES.length);
+          z.hopFrom = z.x; z.hopTo = LANES[pick(opts)]; z.hopT = 0; z.hopCd = rand(1.4, 2.4);
+        }
+      }
+      // Spitters lob fireballs straight down their lane.
+      if (z.spit && z.z < 24 && z.z > 2.5 && (z.spitCd -= dt) <= 0) {
+        z.spitCd = rand(2.6, 3.6);
+        r.fireballs.push({ x: z.x, z: z.z - 0.4, sp: 4.2, t: 0 });
+        Sound.play('throw');
+      }
+
+      if (!z.burrowed && z.z < 0.45 && z.z > -0.5 && contact(z.x, r.cfg.zdmg * z.contact, z.contact, (z.mini ? 0.22 : 0.08) * z.size)) {
+        burst(z.x, z.z, z.color, z.mini ? 30 : 8);
+        if (z.bomb || z.mini) { burst(z.x, z.z, '#ffb02e', 20); Sound.play('explode'); r.shake = 0.35; }
         r.zombies.splice(i, 1);
       } else if (z.z < -1.5) {
         r.zombies.splice(i, 1);
+      }
+    }
+    // Fireballs
+    for (let i = r.fireballs.length - 1; i >= 0; i--) {
+      const f = r.fireballs[i];
+      f.t += dt;
+      f.z -= (f.sp + move) * dt;
+      if (f.z < 0.4) {
+        contact(f.x, r.cfg.zdmg * 1.4, 2, 0.1);
+        burst(f.x, 0.3, '#ff7a1a', 14);
+        Sound.play('thud');
+        r.fireballs.splice(i, 1);
       }
     }
   }
@@ -733,7 +833,7 @@ const Game = (() => {
       const k = r.rocks[i];
       k.t += dt;
       if (k.t >= k.dur) {
-        contact(k.tx, r.boss ? r.boss.dmg : 15, 2 + r.gl * 0.5, 0.25);
+        contact(k.tx, r.boss ? r.boss.dmg : 15, 1 + r.gl * 0.25, 0.25);
         burst(k.tx, 0, '#8fd13b', 12);
         Sound.play('thud');
         r.rocks.splice(i, 1);
@@ -980,7 +1080,8 @@ const Game = (() => {
         list.push({ z: sl.z, fn: () => { const p = proj(sl.x, sl.z); drawTrooper(ctx, p.x, p.y, 0.4 * roadW * p.s, r.t, { phase: sl.ph }); } });
       }
     }
-    for (const z of r.zombies) list.push({ z: z.z, fn: () => { const p = proj(z.x, z.z); drawZombie(ctx, p.x, p.y, 0.62 * z.size * roadW * p.s, z.t, { color: z.color, flash: z.flash, wide: z.type === 'tank' ? 1.25 : 1, shirt: z.shirt, helmet: z.helmet, bomb: z.bomb, seed: z.seed }); if (z.hp < z.maxHp) hpBar(p.x, p.y - 0.72 * z.size * roadW * p.s, 0.34 * roadW * p.s, z.hp / z.maxHp); } });
+    for (const z of r.zombies) list.push({ z: z.z, fn: () => drawOneZombie(z) });
+    for (const f of r.fireballs) list.push({ z: f.z, fn: () => { const p = proj(f.x, f.z); drawFireball(ctx, p.x, p.y - 0.28 * roadW * p.s, Math.max(4, 0.09 * roadW * p.s), r.t + f.t); } });
     for (const g of r.gates) list.push({ z: g.z, fn: () => drawGatePair(g) });
     if (r.boss && r.boss.hp > 0) {
       const b = r.boss;
@@ -1046,6 +1147,11 @@ const Game = (() => {
         ctx.fillStyle = f.color; ctx.strokeStyle = '#14132b'; ctx.lineWidth = 1.5;
         ctx.fillRect(-f.w / 2, -f.h / 2, f.w, f.h); ctx.strokeRect(-f.w / 2, -f.h / 2, f.w, f.h);
         ctx.restore();
+      } else if (f.type === 'scream') {
+        const p = proj(f.x, f.z), k = 1 - a;
+        ctx.globalAlpha = a * 0.8;
+        ctx.strokeStyle = '#ff5a7a'; ctx.lineWidth = Math.max(1.5, 3 * p.s);
+        for (const m of [0.6, 1]) { ctx.beginPath(); ctx.ellipse(p.x, p.y - 0.45 * roadW * p.s, (0.15 + k * 0.5 * m) * roadW * p.s, (0.1 + k * 0.3 * m) * roadW * p.s, 0, 0, Math.PI * 2); ctx.stroke(); }
       } else if (f.type === 'ring') {
         const p = proj(f.x, f.z), k = 1 - a;
         ctx.globalAlpha = a;
@@ -1110,6 +1216,25 @@ const Game = (() => {
     ctx.lineWidth = Math.max(3, size / 4); ctx.strokeStyle = '#14132b';
     ctx.strokeText(text, x, y);
     ctx.fillStyle = color; ctx.fillText(text, x, y);
+  }
+
+  function drawOneZombie(z) {
+    const p = proj(z.x, z.z);
+    const h = 0.62 * z.size * roadW * p.s;
+    if (z.burrowed) { drawDirtMound(ctx, p.x, p.y, 0.5 * roadW * p.s, z.t); return; }
+    const lift = (z.jump || 0) * 0.35 * roadW * p.s;
+    if (z.hyped) {
+      ctx.strokeStyle = 'rgba(255,90,60,.7)'; ctx.lineWidth = Math.max(1.5, 3 * p.s);
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(p.x + k * h * 0.2, p.y - h * 1.05); ctx.lineTo(p.x + k * h * 0.2, p.y - h * 1.3); ctx.stroke(); }
+    }
+    drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
+      helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop });
+    if (z.mini) {
+      // Miniboss: big named health bar
+      const w = 0.9 * roadW * p.s + 40, y = p.y - h * 1.18;
+      hpBar(p.x, y, w, z.hp / z.maxHp);
+      tag(z.name, p.x, y - Math.max(10, w * 0.08), Math.max(12, w * 0.1), '#ffb3c0');
+    } else if (z.hp < z.maxHp) hpBar(p.x, p.y - lift - 0.72 * z.size * roadW * p.s, 0.34 * roadW * p.s, z.hp / z.maxHp);
   }
 
   function hpBar(x, y, w, f) {

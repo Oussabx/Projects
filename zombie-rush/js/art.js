@@ -198,7 +198,7 @@ function shadeHex(hex, amt) {
 // Cartoon zombie facing the camera, feet at (cx, footY), ~100 units tall.
 function drawZombie(ctx, cx, footY, height, t, opts) {
   const { color = '#8fbf5a', flash = 0, wide = 1, boss = false, final = false, shirt = '#6b6f9a',
-    helmet = false, bomb = false, seed = 0 } = opts || {};
+    helmet = false, bomb = false, seed = 0, fat = false, spit = false, scream = false, dig = false, hop = false } = opts || {};
   const hit = flash > 0;
   const skin = hit ? '#ffffff' : color;
   const skinDk = hit ? '#e8e8e8' : shadeHex(color, -0.3);
@@ -259,6 +259,19 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
   ctx.strokeStyle = INK; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(-8, -67); ctx.lineTo(0, -60); ctx.lineTo(8, -67); ctx.stroke();
 
+  if (fat) {
+    // Huge stitched belly bursting out of overalls
+    ctx.beginPath(); ctx.ellipse(0, -42, 27, 21, 0, 0, Math.PI * 2); blob(ctx, skin, lw);
+    ctx.fillStyle = hit ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,.14)';
+    ctx.beginPath(); ctx.ellipse(9, -38, 15, 17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = hit ? '#fff' : skinLt; ctx.beginPath(); ctx.ellipse(-10, -50, 7, 5, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = hit ? '#bbb' : '#5a1f2a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-14, -34); ctx.quadraticCurveTo(0, -28, 14, -36); ctx.stroke();
+    for (let i = 0; i < 5; i++) { const x = -11 + i * 6; ctx.beginPath(); ctx.moveTo(x, -35); ctx.lineTo(x + 2, -29); ctx.stroke(); }
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(0, -44, 2, 0, Math.PI * 2); ctx.fill();
+    for (const s2 of [-1, 1]) { rr(ctx, s2 * 14 - 3, -66, 6, 34, 3); blob(ctx, hit ? '#fff' : '#3d5a9a', 2); }
+  }
+
   if (boss) {
     for (const s of [-1, 1]) {
       ctx.beginPath(); ctx.ellipse(s * 22, -62, 13, 9, 0, 0, Math.PI * 2); blob(ctx, hit ? '#fff' : '#5b5f73', lw);
@@ -290,6 +303,13 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
     for (const f of [-4, 0, 4]) {
       ctx.beginPath(); ctx.moveTo(hx + f - 2, hy - 7); ctx.lineTo(hx + f, hy - 14); ctx.lineTo(hx + f + 2, hy - 7); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+  }
+
+  if (spit && !hit) {
+    const fl = 1 + Math.sin(t * 20) * 0.12;
+    ctx.fillStyle = 'rgba(255,120,30,.45)'; ctx.beginPath(); ctx.arc(0, -60, 13 * fl, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffb02e'; ctx.beginPath(); ctx.arc(0, -60, 8 * fl, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff3a0'; ctx.beginPath(); ctx.arc(-1, -61, 4 * fl, 0, Math.PI * 2); ctx.fill();
   }
 
   // Head, tilted and bobbing
@@ -390,6 +410,26 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
     // Swept fringe
     ctx.beginPath(); ctx.moveTo(-21, -8); ctx.bezierCurveTo(-24, -30, 14, -34, 22, -12);
     ctx.quadraticCurveTo(8, -22, -4, -16); ctx.quadraticCurveTo(-12, -14, -21, -8); ctx.fill();
+  }
+
+  if (scream) {
+    // Enormous screaming mouth
+    ctx.beginPath(); ctx.ellipse(0, 13, 9, 11 + Math.abs(Math.sin(t * 8)) * 3, 0, 0, Math.PI * 2); blob(ctx, hit ? '#ddd' : '#3a0f18', 2.4);
+    ctx.fillStyle = hit ? '#fff' : '#ff6a7a'; ctx.beginPath(); ctx.ellipse(0, 19, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  if (spit && !hit) {
+    ctx.fillStyle = 'rgba(255,150,40,.85)'; ctx.beginPath(); ctx.ellipse(0, 13, 7, 4, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  if (hop) {
+    ctx.fillStyle = hit ? '#fff' : '#e0303a';
+    rr(ctx, -22, -18, 44, 8, 3); ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, -14); ctx.lineTo(30, -8 + Math.sin(t * 12) * 3); ctx.lineTo(27, -18); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (dig) {
+    ctx.beginPath(); ctx.ellipse(0, -14, 26, 19, 0, Math.PI, 0); ctx.closePath(); blob(ctx, hit ? '#fff' : '#ffc933', lw);
+    ctx.beginPath(); ctx.ellipse(0, -14, 30, 5, 0, 0, Math.PI * 2); blob(ctx, hit ? '#fff' : '#e0a400', lw);
+    rr(ctx, -6, -30, 12, 9, 3); blob(ctx, '#5a5f73', 2);
+    ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(0, -25.5, 3, 0, Math.PI * 2); ctx.fill();
   }
 
   if (helmet) {
@@ -851,6 +891,33 @@ function drawNeonLamp(ctx, cx, footY, h, t = 0, side = 1) {
   ctx.beginPath(); ctx.ellipse(lx, -h * 0.93, h * 0.08, h * 0.04, 0, 0, Math.PI * 2); blob(ctx, '#ffd0f4', lw);
   ctx.fillStyle = Math.sin(t * 3 + cx) > -0.9 ? '#2fe0ff' : '#1a8aa0';
   ctx.fillRect(-h * 0.1, -h * 0.55, h * 0.2, h * 0.12);
+  ctx.restore();
+}
+
+function drawFireball(ctx, x, y, r, t) {
+  ctx.save();
+  for (let i = 3; i >= 1; i--) {
+    ctx.fillStyle = `rgba(255,${80 + i * 30},30,${0.18 * i})`;
+    ctx.beginPath(); ctx.ellipse(x, y - r * i * 0.9, r * (1 - i * 0.18), r * 1.2, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#ff7a1a'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, r / 5);
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.arc(x - r * 0.15, y - r * 0.1, r * 0.6 * (1 + Math.sin(t * 25) * 0.1), 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fffbe0'; ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawDirtMound(ctx, x, footY, w, t) {
+  ctx.save();
+  ctx.translate(x, footY);
+  const lw = Math.max(1.5, w / 20);
+  ctx.beginPath(); ctx.ellipse(0, 0, w * 0.55, w * 0.22, 0, Math.PI, 0); ctx.closePath(); blob(ctx, '#7a5a3a', lw);
+  ctx.fillStyle = '#9a7a52';
+  for (let i = 0; i < 4; i++) {
+    const a = t * 6 + i * 1.6;
+    ctx.beginPath(); ctx.arc(Math.cos(a) * w * 0.35, -w * 0.12 - Math.abs(Math.sin(a * 1.3)) * w * 0.2, w * 0.06, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#ffc933'; ctx.beginPath(); ctx.ellipse(0, -w * 0.16, w * 0.14, w * 0.06, 0, Math.PI, 0); ctx.fill();
   ctx.restore();
 }
 

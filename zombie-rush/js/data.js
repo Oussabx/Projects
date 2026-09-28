@@ -260,6 +260,12 @@ const ZOMBIE_TYPES = {
   tank:   { hpMult: 3,   speed: 1.1, size: 1.35, color: '#6f9a74', score: 30 },
   armored: { hpMult: 2.2, speed: 1.3, size: 1.1, color: '#9ab872', score: 20, helmet: true },
   bomber:  { hpMult: 0.6, speed: 5.0, size: 0.8, color: '#a6c46a', score: 15, bomb: true, contact: 2.5 },
+  // Special zombies, mixed in by level (see SPECIALS in game.js).
+  spitter:  { hpMult: 1.2, speed: 1.1, size: 1,    color: '#e0763a', score: 20, spit: true },      // lobs fireballs down its lane
+  hopper:   { hpMult: 0.8, speed: 1.8, size: 0.85, color: '#a878e0', score: 15, hop: true },       // the only one that changes lanes
+  screamer: { hpMult: 1.3, speed: 1.2, size: 0.95, color: '#e2dcc4', score: 20, scream: true },    // speeds up its lane
+  digger:   { hpMult: 1.4, speed: 2.2, size: 1,    color: '#9a8a55', score: 20, dig: true },       // tunnels underground, can't be shot
+  brute:    { hpMult: 26,  speed: 0.8, size: 1.9,  color: '#7aa84a', score: 150, mini: true, contact: 8 }, // Fat Brute miniboss
 };
 
 const BOT_NAMES = [
