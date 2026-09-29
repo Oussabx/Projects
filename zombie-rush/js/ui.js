@@ -326,8 +326,8 @@ const UI = (() => {
     else if (bdp === 'volcano') { drawLavaRock(c, w * 0.1, h * 0.97, h * 0.2, t); drawLavaRock(c, w * 0.9, h * 0.97, h * 0.16, t + 1); }
     else if (selectedChapter > 0) { drawNeonLamp(c, w * 0.08, h * 0.97, h * 0.5, t, -1); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     else { drawCone(c, w * 0.1, h * 0.93, h * 0.13); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
-    drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);
     moodPass(c, w, h, hz, { gradeAmt: 0.28, vignette: 0.45 });
+    drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);   // foreground: keep him out of the horizon haze
   }
 
   // ---------- Gear ----------
@@ -364,7 +364,7 @@ const UI = (() => {
 
     const gc = $('#gear-canvas').getContext('2d');
     drawSoldierFront(gc, 135, 330, 290, 0);
-    drawWeaponSide(gc, equippedWeapon(), 205, 250, 150, { rot: -1.05 });
+    if (!SOLDIER.front.ready) drawWeaponSide(gc, equippedWeapon(), 205, 250, 150, { rot: -1.05 });
     fitInventory();
     const s = $('#screen-gear');
     s.querySelectorAll('[data-item]').forEach(b => b.addEventListener('click', () => itemDetail(+b.dataset.item)));
@@ -1280,6 +1280,7 @@ const UI = (() => {
     Arena.init();
     // Menu art that uses the zombie sprites is redrawn once the sprite sheet has loaded.
     window.addEventListener('mutant-ready', () => { if ($('#game-view').hidden && $('#arena-view').hidden) render(TAB_IDS[tab]); });
+    window.addEventListener('soldier-ready', () => { if ($('#game-view').hidden && $('#arena-view').hidden) render(TAB_IDS[tab]); });
     setTab(2);
     if (document.fonts) document.fonts.ready.then(() => render(TAB_IDS[tab]));
   }

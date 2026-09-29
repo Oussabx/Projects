@@ -45,7 +45,60 @@ function camoSpots(ctx, x, y, w, h) {
   }
 }
 
+// ---------- Realistic soldier (pre-rendered 3D sprite sheets) ----------
+// back: 16-frame run seen from behind/above (lane squad + leader); front: 3/4 standing pose (menus);
+// arena: 8 facing directions x 12 run frames seen from above (dir d faces 90deg + 45deg*d on screen).
+const SOLDIER = {
+  back:  { img: new Image(), ready: false, cols: 8, n: 16, fw: 200, fh: 250, foot: 224.9, modelH: 192.6 },
+  front: { img: new Image(), ready: false, cols: 1, n: 1, fw: 320, fh: 400, foot: 371.8, modelH: 331 },
+  arena: { img: new Image(), ready: false, cols: 12, n: 12, fw: 160, fh: 200, foot: 153.1, modelH: 102.4 },
+};
+// muzzle position per back-view frame (px inside the 200x250 frame)
+const SOLDIER_MUZ = [[93.7,77.7],[92.9,76.6],[91,75.8],[88.5,75.3],[85.7,75.2],[83,75.6],[80.9,76.3],[79.6,77.3],[79.4,78.4],[80.3,76.6],[82.1,75.1],[84.6,73.9],[87.4,73.5],[90.1,73.7],[92.2,74.6],[93.5,76]];
+for (const [k, file] of [['back', 'soldier_back'], ['front', 'soldier_front'], ['arena', 'soldier_arena']]) {
+  const sh = SOLDIER[k];
+  sh.img.onload = () => { sh.ready = true; window.dispatchEvent(new Event('soldier-ready')); };
+  sh.img.src = `assets/${file}.png`;
+}
+function soldierShadow(ctx, cx, footY, r) {
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath(); ctx.ellipse(cx, footY, r, r * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+}
+function soldierFrame(ctx, sh, i, row, cx, footY, k) {
+  const col = row == null ? i % sh.cols : i;
+  const r = row == null ? Math.floor(i / sh.cols) : row;
+  ctx.drawImage(sh.img, col * sh.fw, r * sh.fh, sh.fw, sh.fh,
+    cx - sh.fw / 2 * k, footY - sh.foot * k, sh.fw * k, sh.fh * k);
+}
+function muzzleFlash(ctx, x, y, r) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, 'rgba(255,255,230,1)'); g.addColorStop(0.4, 'rgba(255,200,70,.9)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+// Running away from the camera. phase in radians (matches the old sin(t*14 + phase) stride).
+function drawSoldierRun(ctx, cx, footY, height, t, phase = 0, flash = 0) {
+  const sh = SOLDIER.back, k = height * 1.08 / sh.modelH;
+  const f = Math.floor((((t * 14 + phase) / (Math.PI * 2)) % 1 + 1) % 1 * sh.n) % sh.n;
+  soldierShadow(ctx, cx, footY, sh.modelH * k * 0.2);
+  soldierFrame(ctx, sh, f, null, cx, footY, k);
+  if (flash > 0) {
+    const [mx, my] = SOLDIER_MUZ[f];
+    muzzleFlash(ctx, cx + (mx - sh.fw / 2) * k, footY + (my - sh.foot) * k - 6 * k, 30 * k);
+  }
+}
+function drawSoldierStand(ctx, cx, footY, height, t = 0) {
+  const sh = SOLDIER.front, k = height * 1.12 / sh.modelH;
+  soldierShadow(ctx, cx, footY, sh.modelH * k * 0.2);
+  ctx.save();
+  // subtle breathing
+  const b = 1 + Math.sin(t * 2.2) * 0.006;
+  ctx.translate(cx, footY); ctx.scale(1, b); ctx.translate(-cx, -footY);
+  soldierFrame(ctx, sh, 0, 0, cx, footY, k);
+  ctx.restore();
+}
+
 function drawSoldierFront(ctx, cx, footY, height, t = 0) {
+  if (SOLDIER.front.ready) return drawSoldierStand(ctx, cx, footY, height, t);
   const u = height / 100;
   const bob = Math.sin(t * 3) * 1.2;
   ctx.save();
@@ -116,6 +169,7 @@ function drawSoldierFront(ctx, cx, footY, height, t = 0) {
 }
 
 function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0, weapon = 'rifle') {
+  if (SOLDIER.back.ready) return drawSoldierRun(ctx, cx, footY, height, t, 0, flash);
   const u = height / 100;
   const step = Math.sin(t * 14);
   ctx.save();
@@ -185,6 +239,18 @@ function drawSoldierBack(ctx, cx, footY, height, t = 0, flash = 0, weapon = 'rif
 // aim: radians in screen space (0 = right, -PI/2 = up). walk: animation phase, moving: legs step.
 function drawArenaHero(ctx, cx, footY, height, opts = {}) {
   const { aim = Math.PI / 2, walk = 0, moving = false, flash = 0, weapon = 'rifle' } = opts;
+  if (SOLDIER.arena.ready) {
+    const sh = SOLDIER.arena, k = height * 1.3 / sh.modelH;
+    const d = ((Math.round((aim - Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8;
+    const f = moving ? Math.floor(((walk / (Math.PI * 2)) % 1 + 1) % 1 * sh.n) % sh.n : 0;
+    soldierShadow(ctx, cx, footY, height * 0.26);
+    soldierFrame(ctx, sh, f, d, cx, footY, k);
+    if (flash > 0) {
+      const fx = Math.cos(aim), fy = Math.sin(aim);
+      muzzleFlash(ctx, cx + fx * height * 0.5, footY - height * 0.5 + fy * height * 0.3, height * 0.16);
+    }
+    return;
+  }
   const u = height / 100;
   const fx = Math.cos(aim), fy = Math.sin(aim);
   const back = fy < -0.3;                        // aiming away from the camera
@@ -1218,6 +1284,8 @@ function drawDrum(ctx, cx, footY, h) {
 
 function drawTrooper(ctx, cx, footY, height, t, opts = {}) {
   const { back = true, helmet = '#2f8ff0', flash = 0, phase = 0 } = opts;
+  if (back && SOLDIER.back.ready) return drawSoldierRun(ctx, cx, footY, height * 0.95, t, phase);
+  if (!back && SOLDIER.front.ready) return drawSoldierStand(ctx, cx, footY, height * 0.95, 0);
   const u = height / 100;
   const step = Math.sin(t * 14 + phase);
   ctx.save();
