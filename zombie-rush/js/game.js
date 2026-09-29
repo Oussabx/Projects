@@ -132,7 +132,7 @@ const Game = (() => {
       shield: 0, rage: 0, hurt: 0, flash: 0, shake: 0,
       fireCd: 0.3,
       zombies: [], barrels: [], gates: [], bullets: [], rocks: [], fx: [], texts: [], props: [], fireballs: [], bolts: [],
-      nextSpawn: 9, nextGate: 10, nextProp: 0, nextSaw: 18, saws: [],
+      nextSpawn: 9, nextGate: 10, nextProp: 0, nextSaw: 18, saws: [], blood: [],
       boss: null, bossTimer: 0, bossSummon: 0, bossThrow: 0,
       kills: 0, coins: 0, state: 'playing', endTimer: 0,
       banner: null,
@@ -545,6 +545,8 @@ const Game = (() => {
 
     updateSupport(dt, move);
     updateSaws(dt, move);
+    for (const b of r.blood) b.z -= move;
+    r.blood = r.blood.filter(b => b.z > -3);
     updateBullets(dt);
     updateZombies(dt, move);
     updateBarrels(move);
@@ -867,9 +869,18 @@ const Game = (() => {
     }
   }
 
+  // Blood pools left on the road where zombies fall.
+  function bloodSplat(x, z, size) {
+    const r = run;
+    const spots = Array.from({ length: 6 }, () => [rand(-1, 1), rand(-0.6, 0.6), rand(0.35, 0.9)]);
+    r.blood.push({ x, z, s: rand(0.14, 0.22) * size, spots, rot: rand(0, 3) });
+    if (r.blood.length > 50) r.blood.shift();
+  }
+
   function onKill(t) {
     const r = run;
     if (r.zombies.includes(t)) {
+      bloodSplat(t.x, t.z, t.size || 1);
       r.zombies.splice(r.zombies.indexOf(t), 1);
       r.kills++;
       if (t.mini) {
@@ -1449,6 +1460,17 @@ const Game = (() => {
       ctx.lineWidth = 3;
       ctx.beginPath(); ctx.ellipse(p.x, p.y, 0.3 * roadW, 0.09 * roadW, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    // Blood pools on the asphalt
+    for (const b of r.blood) {
+      const p = proj(b.x, b.z), rx = b.s * XS * roadW * p.s, ry = rx * 0.32;
+      ctx.fillStyle = 'rgba(92,8,12,.72)';
+      ctx.beginPath();
+      for (const [dx, dy, k] of b.spots) { ctx.moveTo(p.x + dx * rx + rx * k, p.y + dy * ry); ctx.ellipse(p.x + dx * rx, p.y + dy * ry, rx * k, ry * k, 0, 0, Math.PI * 2); }
+      ctx.fill();
+      ctx.fillStyle = 'rgba(140,20,24,.45)';
+      ctx.beginPath(); ctx.ellipse(p.x - rx * 0.15, p.y - ry * 0.2, rx * 0.5, ry * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
     // Chainsaw slots
     for (const sw of r.saws) {
       if (sw.z < -1.5 || sw.z > Z_FAR) continue;
@@ -1638,6 +1660,18 @@ const Game = (() => {
       }
     }
 
+    // Atmosphere: haze swallowing the far road, and a dark vignette around the edges
+    {
+      const haze = (r.theme.sky && r.theme.sky[2]) || '#c8d0e0';
+      const n = parseInt(haze.slice(1), 16), hr = n >> 16, hg = (n >> 8) & 255, hb = n & 255;
+      const fg = ctx.createLinearGradient(0, horizon, 0, horizon + (baseY - horizon) * 0.45);
+      fg.addColorStop(0, `rgba(${hr},${hg},${hb},.55)`); fg.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
+      ctx.fillStyle = fg; ctx.fillRect(0, horizon, W, (baseY - horizon) * 0.45);
+      const vg = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.35, W / 2, H * 0.55, H * 0.85);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(10,8,20,.42)');
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    }
+
     // Frost over the screen while frozen
     if (r.frozen > 0) {
       const a = Math.min(1, r.frozen, 4 - r.frozen + 0.2);
@@ -1710,8 +1744,13 @@ const Game = (() => {
       ctx.strokeStyle = 'rgba(255,90,60,.7)'; ctx.lineWidth = Math.max(1.5, 3 * p.s);
       for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(p.x + k * h * 0.2, p.y - h * 1.05); ctx.lineTo(p.x + k * h * 0.2, p.y - h * 1.3); ctx.stroke(); }
     }
-    drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: run.frozen > 0 ? '#bfe8ff' : z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
-      helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop, zap: z.zap, charging: !!z.bolt && !z.bolt.struck });
+    // Plain walkers and runners use the 3D mutant; special zombies keep their own looks.
+    if (MUTANT.ready && (z.type === 'walker' || z.type === 'runner')) {
+      drawMutant(ctx, p.x, p.y - lift, h, z.t, { flash: z.flash, frozen: run.frozen > 0, rate: z.type === 'runner' ? 1.4 : 0.9, seed: z.seed });
+    } else {
+      drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: run.frozen > 0 ? '#bfe8ff' : z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
+        helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop, zap: z.zap, charging: !!z.bolt && !z.bolt.struck });
+    }
     if (run.frozen > 0) {
       // Encased in ice
       ctx.fillStyle = 'rgba(190,235,255,.45)'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1.5, 2.5 * p.s);

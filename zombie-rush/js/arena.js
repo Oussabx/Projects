@@ -1041,10 +1041,14 @@ const Arena = (() => {
     for (const z of r.zombies) {
       if (!vis(z.x, z.y)) continue;
       list.push({ y: z.y, fn: () => {
-        const frame = Math.floor((z.t * 6 / (Math.PI * 2 / 8)) % 8);
-        const spr = zombieSprite(z, frame, z.flash > 0);
         const X = sx(z.x), Y = sy(z.y) - (z.jump || 0) * 30 * S;
-        ctx.drawImage(spr.c, X - spr.ox, Y - spr.oy, spr.c.width / dpr, spr.c.height / dpr);
+        if (MUTANT.ready && (z.type === 'walker' || z.type === 'runner')) {
+          drawMutant(ctx, X, Y, 80 * S * z.size, z.t, { flash: z.flash, rate: z.type === 'runner' ? 1.4 : 0.9, seed: z.x * 0.01 });
+        } else {
+          const frame = Math.floor((z.t * 6 / (Math.PI * 2 / 8)) % 8);
+          const spr = zombieSprite(z, frame, z.flash > 0);
+          ctx.drawImage(spr.c, X - spr.ox, Y - spr.oy, spr.c.width / dpr, spr.c.height / dpr);
+        }
         if (z.mini || z.hp < z.maxHp) {
           const w = (z.mini ? 90 : 36) * S, y = Y - 96 * S * z.size;
           ctx.fillStyle = 'rgba(20,19,43,.85)'; ctx.fillRect(X - w / 2 - 1, y - 1, w + 2, 7);

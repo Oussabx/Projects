@@ -614,6 +614,30 @@ function drawZombie(ctx, cx, footY, height, t, opts) {
   ctx.restore();
 }
 
+// ---------- 3D mutant (pre-rendered walk cycle) ----------
+// assets/mutant_walk.png holds 16 frames of the rigged Mutant model walking toward the camera.
+const MUTANT = { img: new Image(), ready: false, frames: 16, fw: 200, fh: 250, foot: 237.5, modelH: 212 };
+MUTANT.img.onload = () => { MUTANT.ready = true; };
+MUTANT.img.src = 'assets/mutant_walk.png';
+
+// height: the same size unit drawZombie uses. rate: walk cycles per second.
+function drawMutant(ctx, cx, footY, height, t, opts = {}) {
+  const { flash = 0, frozen = false, rate = 0.9, seed = 0 } = opts;
+  const k = height * 1.12 / MUTANT.modelH;
+  const w = MUTANT.fw * k, h = MUTANT.fh * k;
+  const frame = Math.floor((((t + seed) * rate) % 1 + 1) % 1 * MUTANT.frames);
+  // Soft contact shadow
+  const g = ctx.createRadialGradient(cx, footY, 1, cx, footY, height * 0.42);
+  g.addColorStop(0, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(cx, footY, height * 0.42, height * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.save();
+  if (flash > 0) ctx.filter = 'brightness(1.9) saturate(.5)';
+  else if (frozen) ctx.filter = 'hue-rotate(110deg) saturate(.55) brightness(1.35)';
+  ctx.drawImage(MUTANT.img, frame * MUTANT.fw, 0, MUTANT.fw, MUTANT.fh, cx - w / 2, footY - MUTANT.foot * k, w, h);
+  ctx.restore();
+}
+
 // ---------- Bosses ----------
 // A hulking mutant: small hunched head, glowing eyes, roaring jaw, one or two mutated flesh arms with
 // bone claws, torn vest, ripped jeans and spiked boots. Every boss mixes its own parts (see BOSS_LOOKS).
