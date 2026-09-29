@@ -381,9 +381,14 @@ function shadeHex(hex, amt) {
 // ---------- 3D mutant (pre-rendered walk cycle) ----------
 // assets/mutant_walk.png holds 16 frames of the rigged Mutant model walking toward the camera.
 // Every zombie type is this mutant: a colour-tinted copy of the sheet plus a little gear.
-const MUTANT = { img: new Image(), ready: false, frames: 16, fw: 200, fh: 250, foot: 237.5, modelH: 212, sheets: {} };
+// Walk sheet: Mixamo motion-captured zombie walk retargeted onto the Mutant model (v2).
+// Set MUTANT_V1 = true to go back to the previous hand-animated sheet.
+const MUTANT_V1 = false;
+const MUTANT = MUTANT_V1
+  ? { img: new Image(), ready: false, frames: 16, fw: 200, fh: 250, foot: 237.5, modelH: 212, speed: 1, sheets: {} }
+  : { img: new Image(), ready: false, frames: 16, fw: 200, fh: 250, foot: 237.5, modelH: 201, speed: 0.55, sheets: {} };
 MUTANT.img.onload = () => { MUTANT.ready = true; window.dispatchEvent(new Event('mutant-ready')); };
-MUTANT.img.src = 'assets/mutant_walk.png';
+MUTANT.img.src = MUTANT_V1 ? 'assets/mutant_walk_v1.png' : 'assets/mutant_walk.png';
 
 const MUTANT_TINT = {
   runner: 'saturate(1.15) brightness(1.05)',
@@ -417,7 +422,7 @@ function mutantSheet(key) {
 // height: zombie size unit (the drawn figure is a bit taller). rate: walk cycles per second.
 function drawMutant(ctx, cx, footY, height, t, opts = {}) {
   if (!MUTANT.ready) return;
-  const { type = 'walker', flash = 0, frozen = false, rate = type === 'runner' ? 1.4 : 0.9, seed = 0, wide = type === 'tank' ? 1.3 : type === 'brute' ? 1.35 : 1, charging = false } = opts;
+  const { type = 'walker', flash = 0, frozen = false, rate = (type === 'runner' ? 1.4 : 0.9) * MUTANT.speed, seed = 0, wide = type === 'tank' ? 1.3 : type === 'brute' ? 1.35 : 1, charging = false } = opts;
   const k = height * 1.12 / MUTANT.modelH;
   const w = MUTANT.fw * k * wide, h = MUTANT.fh * k;
   const frame = Math.floor((((t + seed) * rate) % 1 + 1) % 1 * MUTANT.frames);
