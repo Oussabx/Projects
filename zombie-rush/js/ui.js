@@ -310,11 +310,14 @@ const UI = (() => {
       const w0 = 1 + f0 * 5, w1 = 1 + f1 * 5;
       c.beginPath(); c.moveTo(w / 2 - w0, y0); c.lineTo(w / 2 + w0, y0); c.lineTo(w / 2 + w1, y1); c.lineTo(w / 2 - w1, y1); c.fill();
     }
+    drawBloodPool(c, w * 0.46, hz + (h - hz) * 0.42, w * 0.07, 1);
+    drawBloodPool(c, w * 0.62, hz + (h - hz) * 0.7, w * 0.1, 2);
+    drawBloodPool(c, w * 0.3, hz + (h - hz) * 0.25, w * 0.05, 3);
     drawBoss(c, w * 0.8, hz + h * 0.12, h * 0.44, t, { color: lvl.boss.color, name: lvl.boss.name, final: lvl.boss.final });
     const ch2 = selectedChapter > 0;
     walkers.forEach((z, i) => {
       const y = hz + (h - hz) * z.z * 0.55;
-      drawZombie(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { color: th.skin ? shadeHex(th.skin, (i % 3) * 0.08) : z.color, shirt: ['#5b6cff', '#ff5fb4', '#2fb8e0', '#a55cff'][i % 4], seed: i * 1.37, helmet: ch2 && i % 3 === 0, bomb: ch2 && i % 3 === 1 });
+      drawMutant(c, w / 2 + z.x * w * 0.45, y, h * 0.16 * (0.6 + z.z), t + z.t, { type: ch2 && i % 3 === 0 ? 'armored' : ch2 && i % 3 === 1 ? 'bomber' : 'walker', seed: i * 1.37 });
     });
     const bdp = th.backdrop || (th.mesas ? 'mesas' : 'city');
     if (bdp === 'mesas') { drawCactus(c, w * 0.1, h * 0.95, h * 0.26); drawDrum(c, w * 0.9, h * 0.97, h * 0.15); }
@@ -324,6 +327,7 @@ const UI = (() => {
     else if (selectedChapter > 0) { drawNeonLamp(c, w * 0.08, h * 0.97, h * 0.5, t, -1); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     else { drawCone(c, w * 0.1, h * 0.93, h * 0.13); drawBarrel(c, w * 0.9, h * 0.97, h * 0.12, h * 0.15, ''); }
     drawSoldierFront(c, w * 0.42, h * 0.97, h * 0.62, t);
+    moodPass(c, w, h, hz, { gradeAmt: 0.28, vignette: 0.45 });
   }
 
   // ---------- Gear ----------
@@ -758,7 +762,8 @@ const UI = (() => {
   function drawModeArt(c, id) {
     const w = 320, h = 180;
     const sky = c.createLinearGradient(0, 0, 0, h);
-    const cols = { touchline: ['#ff8a7a', '#ffd2b0'], survival: ['#5b3a9a', '#b98ae8'], extraction: ['#3aa0d8', '#bfeaff'], ammo: ['#d88a1a', '#ffe0a0'] }[id];
+    // Dusk skies: blood-red, night purple, overcast grey, dusty amber
+    const cols = { touchline: ['#2e2436', '#b0644a'], survival: ['#140f26', '#5a3470'], extraction: ['#27323f', '#8a9aa6'], ammo: ['#2e2014', '#a8702e'] }[id];
     sky.addColorStop(0, cols[0]); sky.addColorStop(1, cols[1]);
     c.fillStyle = sky; c.fillRect(0, 0, w, h);
     c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(0, h * 0.62, w, h);
@@ -766,16 +771,16 @@ const UI = (() => {
       c.fillStyle = '#8a8f9c'; c.beginPath(); c.moveTo(w * 0.35, h * 0.3); c.lineTo(w * 0.65, h * 0.3); c.lineTo(w, h); c.lineTo(0, h); c.fill();
       c.strokeStyle = '#fff'; c.lineWidth = 7; c.setLineDash([16, 10]); c.beginPath(); c.moveTo(0, h * 0.86); c.lineTo(w, h * 0.86); c.stroke();
       c.strokeStyle = '#ff3b3b'; c.lineDashOffset = 13; c.beginPath(); c.moveTo(0, h * 0.86); c.lineTo(w, h * 0.86); c.stroke(); c.setLineDash([]);
-      [[0.33, 0.62, 58], [0.55, 0.52, 44], [0.72, 0.66, 62], [0.45, 0.45, 34]].forEach(([x, y, s2], i) => drawZombie(c, w * x, h * y, s2 * 1.25, i, { seed: i * 0.2 }));
+      [[0.45, 0.45, 34], [0.55, 0.52, 44], [0.33, 0.62, 58], [0.72, 0.66, 62]].forEach(([x, y, s2], i) => drawMutant(c, w * x, h * y, s2 * 1.25, i * 0.3, { seed: i * 0.2 }));
       drawSoldierBack(c, w * 0.5, h * 0.99, 70, 0, 0, 'rifle');
     } else if (id === 'survival') {
-      for (let i = 0; i < 9; i++) drawZombie(c, w * (0.1 + (i % 5) * 0.2 + (i > 4 ? 0.1 : 0)), h * (i > 4 ? 0.98 : 0.72), i > 4 ? 90 : 62, i * 0.7, { seed: i * 0.13, color: i === 2 ? '#e0763a' : undefined, spit: i === 2 });
+      for (let i = 0; i < 9; i++) drawMutant(c, w * (0.1 + (i % 5) * 0.2 + (i > 4 ? 0.1 : 0)), h * (i > 4 ? 0.98 : 0.72), i > 4 ? 90 : 62, i * 0.37, { type: i === 2 ? 'spitter' : i === 6 ? 'armored' : 'walker', seed: i * 0.13 });
       drawBoss(c, w * 0.5, h * 0.62, 120, 0.3, { color: '#7aa84a', name: 'Sewer Hulk' });
     } else if (id === 'extraction') {
       c.fillStyle = 'rgba(40,45,60,.5)'; c.beginPath(); c.ellipse(w * 0.62, h * 0.85, 90, 26, 0, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#ffd23a'; c.lineWidth = 4; c.setLineDash([10, 6]); c.stroke(); c.setLineDash([]);
       drawHeli(c, w * 0.62, h * 0.38, 120, 0.4, false);
-      drawZombie(c, w * 0.15, h * 0.95, 80, 0.2, { seed: 0.1 }); drawZombie(c, w * 0.9, h * 0.98, 84, 1.2, { seed: 0.3 });
+      drawMutant(c, w * 0.15, h * 0.95, 80, 0.2, { seed: 0.1 }); drawMutant(c, w * 0.9, h * 0.98, 84, 0.6, { seed: 0.3 });
       drawSoldierFront(c, w * 0.36, h * 0.98, 84, 0);
     } else {
       [[0.2, 0.7], [0.82, 0.74]].forEach(([x, y]) => {
@@ -783,10 +788,11 @@ const UI = (() => {
         c.fillStyle = '#e0303a'; c.strokeStyle = '#14132b'; c.lineWidth = 3; c.fillRect(X - bw / 2, Y - bh, bw, bh); c.strokeRect(X - bw / 2, Y - bh, bw, bh);
         c.fillStyle = '#ffd23a'; c.beginPath(); c.moveTo(X, Y - bh * 0.7); c.lineTo(X + 9, Y - bh * 0.35); c.lineTo(X - 9, Y - bh * 0.35); c.closePath(); c.fill(); c.stroke();
       });
-      drawZombie(c, w * 0.52, h * 0.78, 86, 0.4, { seed: 0.2 });
+      drawMutant(c, w * 0.52, h * 0.78, 86, 0.4, { seed: 0.2 });
       for (let i = 0; i < 3; i++) { c.save(); c.translate(w * (0.35 + i * 0.08), h * 0.22); c.rotate(0.3); c.fillStyle = '#ffd23a'; c.strokeStyle = '#14132b'; c.lineWidth = 3; c.beginPath(); c.roundRect ? c.roundRect(-7, -22, 14, 36, 7) : c.rect(-7, -22, 14, 36); c.fill(); c.stroke(); c.fillStyle = '#c98a2a'; c.fillRect(-7, 6, 14, 8); c.restore(); }
       c.font = '900 30px "Lilita One", system-ui'; c.fillStyle = '#fff'; c.strokeStyle = '#14132b'; c.lineWidth = 6; c.strokeText('3', w * 0.72, h * 0.3); c.fillText('3', w * 0.72, h * 0.3);
     }
+    moodPass(c, w, h, h * 0.4, { gradeAmt: 0.22, haze: '180,180,195', vignette: 0.55 });
   }
 
   function startMode(id) {
@@ -1096,11 +1102,10 @@ const UI = (() => {
     c.strokeStyle = '#fff'; c.lineWidth = 6; c.setLineDash([30, 30]); c.lineDashOffset = -t * 120;
     c.beginPath(); c.moveTo(w / 2, h * 0.37); c.lineTo(w / 2, h); c.stroke(); c.setLineDash([]);
     const zx = [0.4, 0.5, 0.6];
-    const zColor = id === 'freeze' ? '#bfe8ff' : '#7cc24a';
     zx.forEach((x, i) => {
       const k = id === 'freeze' ? 0.55 : ((t * 0.25 + i * 0.33) % 1);
       const s = 0.3 + k * 0.7;
-      drawZombie(c, w * (0.5 + (x - 0.5) * (0.6 + k * 1.4)), h * (0.4 + k * 0.45), 110 * s, id === 'freeze' ? 0 : t + i, { color: zColor, seed: i + 1 });
+      drawMutant(c, w * (0.5 + (x - 0.5) * (0.6 + k * 1.4)), h * (0.4 + k * 0.45), 110 * s, id === 'freeze' ? 0 : t + i, { frozen: id === 'freeze', seed: i + 1 });
     });
     if (id === 'air') {
       const k = (t * 0.45) % 1;
@@ -1207,7 +1212,7 @@ const UI = (() => {
           <button class="btn grey" id="m-home"><span class="tx">Home</span></button>
           <button class="btn" id="m-retry"><span class="tx">Retry</span></button>
         </div>`, { ribbon: 'red', cls: 'defeat' });
-      drawZombie($('#m-art').getContext('2d'), 150, 250, 230, 0.4, { color: '#8fbf5a', shirt: '#6b4fb8', seed: 0.2 });
+      drawMutant($('#m-art').getContext('2d'), 150, 262, 200, 0.4, { seed: 0.2 });
       $('#m-skills').onclick = () => leaveGame(3);
       $('#m-gear').onclick = () => leaveGame(1);
     }
@@ -1273,6 +1278,8 @@ const UI = (() => {
     selectedLevel = Math.max(0, progress().unlocked - 1);
     Game.init();
     Arena.init();
+    // Menu art that uses the zombie sprites is redrawn once the sprite sheet has loaded.
+    window.addEventListener('mutant-ready', () => { if ($('#game-view').hidden && $('#arena-view').hidden) render(TAB_IDS[tab]); });
     setTab(2);
     if (document.fonts) document.fonts.ready.then(() => render(TAB_IDS[tab]));
   }

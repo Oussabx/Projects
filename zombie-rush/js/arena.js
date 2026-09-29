@@ -95,7 +95,6 @@ const Arena = (() => {
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     S = Math.min(W / 560, H / 900);
-    spriteCache.clear();
     if (run && run.state !== 'playing') draw();
   }
 
@@ -773,26 +772,6 @@ const Arena = (() => {
 
   // ---------- Drawing ----------
 
-  // Zombies are drawn from cached sprites: 8 walk frames per type, plus a white hit-flash frame.
-  const spriteCache = new Map();
-  function zombieSprite(z, frame, flash) {
-    const key = `${z.type}|${z.color}|${flash ? 'f' : frame}`;
-    let spr = spriteCache.get(key);
-    if (!spr) {
-      const zt = TYPES[z.type];
-      const h = 80 * S * zt.size * dpr;
-      const c = document.createElement('canvas');
-      c.width = Math.ceil(h * 1.25 * (zt.wide || 1)); c.height = Math.ceil(h * 1.4);
-      const g = c.getContext('2d');
-      drawZombie(g, c.width / 2, c.height - h * 0.08, h, (flash ? 0 : frame) / 8 * (Math.PI * 2 / 6) * 2, {
-        color: z.color, flash: flash ? 1 : 0, wide: zt.wide || 1, seed: { walker: 0.1, runner: 0.2, tank: 0.35, armored: 0.1, spitter: 0.2, hopper: 0.35, brute: 0.3 }[z.type],
-        fat: !!zt.fat, spit: !!zt.spit, hop: !!zt.hop, helmet: !!zt.helmet, shirt: '#d8c8a8',
-      });
-      spr = { c, ox: c.width / 2 / dpr, oy: (c.height - h * 0.08) / dpr };
-      spriteCache.set(key, spr);
-    }
-    return spr;
-  }
 
   function drawGroundLayer() {
     const r = run, th = r.theme;
@@ -1042,13 +1021,7 @@ const Arena = (() => {
       if (!vis(z.x, z.y)) continue;
       list.push({ y: z.y, fn: () => {
         const X = sx(z.x), Y = sy(z.y) - (z.jump || 0) * 30 * S;
-        if (MUTANT.ready && (z.type === 'walker' || z.type === 'runner')) {
-          drawMutant(ctx, X, Y, 80 * S * z.size, z.t, { flash: z.flash, rate: z.type === 'runner' ? 1.4 : 0.9, seed: z.x * 0.01 });
-        } else {
-          const frame = Math.floor((z.t * 6 / (Math.PI * 2 / 8)) % 8);
-          const spr = zombieSprite(z, frame, z.flash > 0);
-          ctx.drawImage(spr.c, X - spr.ox, Y - spr.oy, spr.c.width / dpr, spr.c.height / dpr);
-        }
+        drawMutant(ctx, X, Y, 80 * S * z.size, z.t, { type: z.type, flash: z.flash, seed: z.x * 0.01 });
         if (z.mini || z.hp < z.maxHp) {
           const w = (z.mini ? 90 : 36) * S, y = Y - 96 * S * z.size;
           ctx.fillStyle = 'rgba(20,19,43,.85)'; ctx.fillRect(X - w / 2 - 1, y - 1, w + 2, 7);
@@ -1146,6 +1119,9 @@ const Arena = (() => {
       const near = r.ammoBoxes.slice().sort((a, b) => dist(a, p) - dist(b, p))[0];
       if (near) drawArrow(near.x, near.y, '#ffe14d');
     }
+
+    // Mood: darker grade and vignette so the arena matches the realistic zombies
+    moodPass(ctx, W, H, -H, { gradeAmt: 0.25, vignette: 0.5 });
 
     // Damage vignette
     if (p.hurt > 0 || r.hp < r.maxHp * 0.3) {

@@ -1744,13 +1744,7 @@ const Game = (() => {
       ctx.strokeStyle = 'rgba(255,90,60,.7)'; ctx.lineWidth = Math.max(1.5, 3 * p.s);
       for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(p.x + k * h * 0.2, p.y - h * 1.05); ctx.lineTo(p.x + k * h * 0.2, p.y - h * 1.3); ctx.stroke(); }
     }
-    // Plain walkers and runners use the 3D mutant; special zombies keep their own looks.
-    if (MUTANT.ready && (z.type === 'walker' || z.type === 'runner')) {
-      drawMutant(ctx, p.x, p.y - lift, h, z.t, { flash: z.flash, frozen: run.frozen > 0, rate: z.type === 'runner' ? 1.4 : 0.9, seed: z.seed });
-    } else {
-      drawZombie(ctx, p.x, p.y - lift, h, z.t, { color: run.frozen > 0 ? '#bfe8ff' : z.color, flash: z.flash, wide: z.mini ? 1.45 : z.type === 'tank' ? 1.25 : 1, shirt: z.shirt,
-        helmet: z.helmet, bomb: z.bomb, seed: z.seed, fat: z.mini, spit: z.spit, scream: z.scream, dig: z.dig, hop: z.hop, zap: z.zap, charging: !!z.bolt && !z.bolt.struck });
-    }
+    drawMutant(ctx, p.x, p.y - lift, h, z.t, { type: z.type, flash: z.flash, frozen: run.frozen > 0, seed: z.seed, charging: !!z.bolt && !z.bolt.struck });
     if (run.frozen > 0) {
       // Encased in ice
       ctx.fillStyle = 'rgba(190,235,255,.45)'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = Math.max(1.5, 2.5 * p.s);
