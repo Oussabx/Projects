@@ -55,7 +55,9 @@ const SOLDIER = {
 };
 // muzzle position per back-view frame (px inside the 200x250 frame)
 const SOLDIER_MUZ = [[93.7,77.7],[92.9,76.6],[91,75.8],[88.5,75.3],[85.7,75.2],[83,75.6],[80.9,76.3],[79.6,77.3],[79.4,78.4],[80.3,76.6],[82.1,75.1],[84.6,73.9],[87.4,73.5],[90.1,73.7],[92.2,74.6],[93.5,76]];
-for (const [k, file] of [['back', 'soldier_back'], ['front', 'soldier_front'], ['arena', 'soldier_arena']]) {
+// Off: the pilot model didn't look right in game. Flip to true once a better model/animation is rendered.
+const USE_REAL_SOLDIER = false;
+if (USE_REAL_SOLDIER) for (const [k, file] of [['back', 'soldier_back'], ['front', 'soldier_front'], ['arena', 'soldier_arena']]) {
   const sh = SOLDIER[k];
   sh.img.onload = () => { sh.ready = true; window.dispatchEvent(new Event('soldier-ready')); };
   sh.img.src = `assets/${file}.png`;
