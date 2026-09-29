@@ -652,19 +652,18 @@ const Game = (() => {
       b.x += b.vx * dt;
       let hit = false;
 
-      // Blue signs are shootable: bullets crossing a sign's plane chip its HP; breaking it grants the power-up.
+      // Bullets pass through signs, changing the sign's number on the way (each sign counts a bullet once).
       for (const gt of r.gates) {
         if (b.rocket ? !(b.z >= gt.z && prevZ < gt.z + 0.4) : !(prevZ < gt.z && b.z >= gt.z)) continue;
+        if (b.signs && b.signs.has(gt)) continue;
         const sd = gt.sides.find(sd => sd.side === (b.x < 0 ? -1 : 1));
-        if (!sd || sd.broken || Math.abs(b.x) > 0.97) continue;
-        if (sd.flipT > 0) { hit = true; break; }     // mid-flip: soaks bullets
+        if (!sd || Math.abs(b.x) > 0.97) continue;
+        (b.signs || (b.signs = new Set())).add(gt);
+        if (sd.flipT > 0) continue;
         const { dmg } = bulletDamage(b.rocket ? b.m * 2 : b.m);
         sd.hp = Math.max(0, sd.hp - dmg); sd.flash = 0.06;
         shiftGate(sd);
-        Sound.play('hit');
         if (sd.hp <= 0 && sd.val < 0) flipGate(gt, sd);
-        hit = true;
-        break;
       }
 
       if (!hit) {
