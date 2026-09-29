@@ -26,8 +26,8 @@ DIST = os.path.join(HERE, 'dist')
 
 PACKAGE = 'com.zombierush.game'
 APP_NAME = 'Zombie Rush'
-VERSION_CODE = 15
-VERSION_NAME = '2.4'
+VERSION_CODE = 16
+VERSION_NAME = '2.5'
 MIN_SDK = 24  # Android 7.0; v2 signing only
 TARGET_SDK = 34
 
