@@ -316,7 +316,9 @@ const Game = (() => {
     let a = gateOption(true);
     // Comeback: a squad that got whittled down always gets a soldier sign to rebuild with.
     if (run.squad < 12) a = { type: 'squad', val: Math.round(rand(6, 9) + run.gl * 1.1) };
-    let b = gateOption(supply || Math.random() < (run.gl < 2 ? 0.25 : 0.45));
+    // More red: most pairs carry a penalty, and some are red on both sides (shoot one to flip it).
+    if (!supply && run.squad >= 12 && Math.random() < 0.25) a = gateOption(false);
+    let b = gateOption(supply || Math.random() < (run.gl < 2 ? 0.15 : 0.25));
     if (!supply && b.type === a.type && a.type !== 'dmg' && a.type !== 'rate' && a.type !== 'squad') b = gateOption(false);
     const sides = Math.random() < 0.5 ? [a, b] : [b, a];
     const hpFor = o => o.val < 0 ? Math.round((40 + run.gl * 45) * rand(0.85, 1.15) / 5) * 5 : Math.round((45 + run.gl * 55) * (o.type === 'mult' ? 1.8 : o.type === 'drop' && (o.drop === 'minigun' || o.drop === 'rocket') ? 1.7 : o.type === 'squad' ? 1.2 : 1) * rand(0.85, 1.15) / 5) * 5;
